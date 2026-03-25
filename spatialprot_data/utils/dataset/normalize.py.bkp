@@ -1,0 +1,552 @@
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+from pathlib import Path
+from typing import Callable, Optional, Dict, Type, Tuple
+
+import numpy as np
+import pandas as pd
+import torch
+from loguru import logger
+from dataclasses import dataclass
+from spatialprot_data.utils.utils import print_verbose
+
+class BaseNormalizer(ABC):
+    """
+    Abstract base for all normalizers.
+
+    Responsibilities:
+    - Load any required per-dataset stats (quantiles, means, stds, etc.).
+    - Provide channel selection based on availability and masks.
+    - Apply the normalization to an input tensor/ndarray of shape (C, H, W).
+
+    Conventions:
+    - All apply() implementations accept inputs with channels already filtered
+      down to the selected/valid set; they also receive the measured and
+      selected masks to align per-channel stats.
+    - Returns a torch.FloatTensor of shape (C, H, W).
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        modality_dir: str | Path,
+        channels_per_image: pd.DataFrame,
+        apply_gaussian: bool = False,
+        apply_median: bool = False,
+        gaussian_blur: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        median_filter_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        disable_quantile_mask: bool = False,
+        **kwargs,
+    ) -> None:
+        self.name = name
+        self.modality_dir = Path(modality_dir)
+        self.channels_per_image = channels_per_image
+        self.apply_gaussian = apply_gaussian
+        self.apply_median = apply_median
+        self.gaussian_blur = gaussian_blur
+        self.median_filter_fn = median_filter_fn
+        self.disable_quantile_mask = disable_quantile_mask
+
+        # These can be optionally populated by subclasses
+        self.quantile_df: Optional[pd.DataFrame] = None
+        self.quantile_mask_df: Optional[pd.DataFrame] = None
+
+    # ---- Public API
+    @abstractmethod
+    def apply(
+        self,
+        x: np.ndarray | torch.Tensor,
+        tissue_id: str,
+        measured_mask: np.ndarray,
+        selected_mask: np.ndarray,
+    ) -> torch.Tensor:
+        """
+        Apply normalization to x (C, H, W).
+
+        Args:
+            x: Input array/tensor with channels already filtered to selected_mask.
+            tissue_id: Identifier for the tissue row to fetch stats for.
+            measured_mask: Boolean mask over all channels indicating which were measured for this tissue.
+            selected_mask: Boolean mask over the measured channels indicating which channels were retained
+                           (e.g., those with embeddings and passing quantile/std filters). Length equals C in x.
+        Returns:
+            torch.FloatTensor of shape (C, H, W)
+        """
+        raise NotImplementedError
+
+    def _refine_selected_mask(
+            self,
+            tissue_id: str,
+            measured_mask: np.ndarray,
+            selected_mask: np.ndarray
+    ) -> np.ndarray:
+        """
+        Further refine the selected_mask based on quantile/std masks managed by the normalizer.
+
+        Returns a boolean array of length measured_mask.sum() suitable to index the
+        per-image measured channels.
+        """
+        if self.disable_quantile_mask:
+            return selected_mask
+
+        qmask = self._get_quantile_mask_row(tissue_id)
+        if qmask is not None:
+            selected_mask = selected_mask & qmask[measured_mask]
+        return selected_mask
+
+
+    def _maybe_downselect_x_to_refined(
+            self,
+            x_t: torch.Tensor,
+            selected_mask_before: np.ndarray,
+            selected_mask_after: np.ndarray
+    ) -> torch.Tensor:
+        """
+        If refinement removed channels, drop the corresponding rows from x.
+        - selected_mask_before: bool over measured channels (len = C_meas)
+        - x currently has C_sel_old = selected_mask_before.sum() channels.
+        - selected_mask_after is also over measured channels; to map into the
+          current x, index it by selected_mask_before.
+        """
+        if selected_mask_after is selected_mask_before:
+            return x_t
+        if np.array_equal(selected_mask_after, selected_mask_before):
+            return x_t
+        keep_in_selected_space = selected_mask_after[selected_mask_before]
+        if keep_in_selected_space.all():
+            return x_t
+        keep_t = torch.from_numpy(keep_in_selected_space, dtype=bool)
+        return x_t[keep_t]
+    
+
+    def _refine_and_slice(
+        self,
+        x_t: torch.Tensor,
+        tissue_id: str,
+        measured_mask: np.ndarray,
+        selected_mask: np.ndarray,
+    ) -> tuple[torch.Tensor, np.ndarray]:
+        """
+        Refine `selected_mask` with the normalizer's quantile/std mask (if any),
+        and slice `x_t` (currently in selected space) to match the refined mask.
+        [NOTE: This is a replacement for _refine_selected_mask + _maybe_downselect_x_to_refined.]
+        Args:
+          x_t:           (C_sel, H, W) tensor already filtered by `selected_mask`
+          measured_mask: (C_max,) over all channels
+          selected_mask: (C_meas,) over measured channels
+
+        Returns:
+          x_ref:   (C_ref, H, W) possibly further reduced
+          refined: (C_meas,) refined boolean mask over measured channels
+        """
+        refined = self._refine_selected_mask(tissue_id, measured_mask, selected_mask)
+
+        # Fast paths if nothing changed
+        if refined is selected_mask or np.array_equal(refined, selected_mask):
+            return x_t, refined
+
+        # Map refined (measured space) into the current x (selected space)
+        keep_in_selected = np.asarray(refined[selected_mask], dtype=bool)
+        if keep_in_selected.all():
+            return x_t, refined
+
+        keep_t = torch.from_numpy(keep_in_selected)
+        x_t = x_t[keep_t]
+        return x_t, refined
+    
+
+
+    # ---- Helpers for subclasses
+    def _ensure_tensor(self, x: np.ndarray | torch.Tensor) -> torch.Tensor:
+        if isinstance(x, np.ndarray):
+            return torch.from_numpy(x).float()
+        return x.float()
+
+    def _get_quantile_mask_row(self, tissue_id: str) -> Optional[np.ndarray]:
+        if self.quantile_mask_df is None:
+            return None
+        # Align with channels_per_image columns
+        row = self.quantile_mask_df.reindex(index=self.channels_per_image.index, columns=self.channels_per_image.columns)
+        try:
+            return row.loc[tissue_id].values.astype(bool)
+        except KeyError:
+            logger.error(f"Tissue id {tissue_id} not found in quantile mask.")
+            raise
+
+    def _apply_optional_filters(self, x: torch.Tensor) -> torch.Tensor:
+        if self.apply_gaussian and self.gaussian_blur is not None:
+            x = self.gaussian_blur(x)
+        if self.apply_median and self.median_filter_fn is not None:
+            # median_filter_fn expected to take/return (C,H,W) torch tensor
+            x = self.median_filter_fn(x)
+        return x
+
+    def __str__(self) -> str:
+        return super().__str__() + f"(name={self.name})"
+    
+
+class IdentityNormalizer(BaseNormalizer):
+    """
+    No-op normalizer that returns the input as-is (except for optional filtering).
+    """
+
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(name="identity", **kwargs)
+
+    def apply(self, x: np.ndarray | torch.Tensor, *args, **kwargs) -> torch.Tensor:
+        x_t = self._ensure_tensor(x)
+        x_t = self._apply_optional_filters(x_t)
+        return x_t, None
+
+class GlobalStdNormalizer(BaseNormalizer):
+    """
+    Clip to per-image q99, log1p, optional blur, then standardize using global
+    log-mean/log-std from channel file.
+    """
+
+    def __init__(
+        self,
+        *,
+        modality_dir: str | Path,
+        channels_per_image: pd.DataFrame,
+        channel_file_name: str,
+        mean_name: str,
+        std_name: str,
+        quantile_path: str | Path,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            name="global_std",
+            modality_dir=modality_dir,
+            channels_per_image=channels_per_image,
+            **kwargs,
+        )
+        channels_path = Path(modality_dir) / f"{channel_file_name}.csv"
+        channels_df = pd.read_csv(channels_path)
+        self.log_mean = channels_df[mean_name].values
+        self.log_std = channels_df[std_name].values
+
+        q_path = Path(modality_dir) / quantile_path
+        self.quantile_df = pd.read_csv(q_path, index_col=0)
+        # Simple >0 mask to prune invalid channels
+        qmask = self.quantile_df.reindex(index=self.channels_per_image.index, columns=self.channels_per_image.columns)
+        qmask = qmask.fillna(0) > 0
+        self.quantile_mask_df = qmask
+
+    def apply(self, x: np.ndarray | torch.Tensor, tissue_id: str, measured_mask: np.ndarray, selected_mask: np.ndarray, **kwargs) -> Tuple[torch.Tensor, np.ndarray]:
+        assert self.quantile_df is not None
+        x_t = self._ensure_tensor(x)
+        x_t, refined = self._refine_and_slice(x_t, tissue_id, measured_mask, selected_mask)
+
+        clip_vals = self.quantile_df.loc[tissue_id].values[measured_mask][refined]
+        clip_t = torch.from_numpy(clip_vals).float()[:, None, None]
+        min_t = torch.zeros_like(clip_t)
+        x_t = torch.clamp(x_t, min=min_t, max=clip_t)
+
+        x_t = torch.log1p(x_t)
+        x_t = self._apply_optional_filters(x_t)
+
+        mean = self.log_mean[measured_mask][refined]
+        std = self.log_std[measured_mask][refined]
+        mean_t = torch.from_numpy(mean).float()[:, None, None]
+        std_t = torch.from_numpy(std).float()[:, None, None]
+        return (x_t - mean_t) / std_t, refined
+
+
+class TMLocalQGlobalStdNormalizer(BaseNormalizer):
+    """
+    Clip to per-image quantiles, log1p, optional blur, then standardize using
+    per-image global means/stds (loaded from CSVs) for the log-transformed space.
+    """
+
+    def __init__(
+        self,
+        *,
+        modality_dir: str | Path,
+        channels_per_image: pd.DataFrame,
+        quantile_path: str | Path,
+        means_path: str | Path,
+        stds_path: str | Path,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            name="tm_local_q_global_std",
+            modality_dir=modality_dir,
+            channels_per_image=channels_per_image,
+            **kwargs,
+        )
+        base = Path(modality_dir)
+        self.quantile_df = pd.read_csv(base / quantile_path, index_col=0)
+        self.means_df = pd.read_csv(base / means_path, index_col=0)
+        self.stds_df = pd.read_csv(base / stds_path, index_col=0)
+
+        # Mask: valid quantile > 0 and std > 0
+        q = self.quantile_df.reindex(index=self.channels_per_image.index, columns=self.channels_per_image.columns)
+        s = self.stds_df.reindex(index=self.channels_per_image.index, columns=self.channels_per_image.columns)
+        self.quantile_mask_df = (q.notna() & (q > 0)) & (s.notna() & (s > 0))
+
+    def apply(self, x: np.ndarray | torch.Tensor, tissue_id: str, measured_mask: np.ndarray, selected_mask: np.ndarray) -> Tuple[torch.Tensor, np.ndarray]:
+        assert self.quantile_df is not None
+        x_t = self._ensure_tensor(x)
+        x_t, refined = self._refine_and_slice(x_t, tissue_id, measured_mask, selected_mask)
+        clip_vals = self.quantile_df.loc[tissue_id].values[measured_mask][refined]
+        clip_t = torch.from_numpy(clip_vals).float()[:, None, None]
+        min_t = torch.zeros_like(clip_t)
+        x_t = torch.clamp(x_t, min=min_t, max=clip_t)
+
+        x_t = torch.log1p(x_t)
+        x_t = self._apply_optional_filters(x_t)
+
+        mean_vals = self.means_df.loc[tissue_id].values[measured_mask][refined]
+        std_vals = self.stds_df.loc[tissue_id].values[measured_mask][refined]
+        mean_t = torch.from_numpy(mean_vals).float()[:, None, None]
+        std_t = torch.from_numpy(std_vals).float()[:, None, None]
+        return (x_t - mean_t) / (std_t + 1e-9), refined
+
+
+class Q99Normalizer(BaseNormalizer):
+    """
+    Clip to per-image q99, divide by q99, optional blur. No standardization.
+    """
+
+    def __init__(
+        self,
+        *,
+        modality_dir: str | Path,
+        channels_per_image: pd.DataFrame,
+        quantile_path: str | Path,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            name="q_99",
+            modality_dir=modality_dir,
+            channels_per_image=channels_per_image,
+            **kwargs,
+        )
+        q_path = Path(modality_dir) / quantile_path
+        self.quantile_df = pd.read_csv(q_path, index_col=0)
+        qmask = self.quantile_df.reindex(index=self.channels_per_image.index, columns=self.channels_per_image.columns)
+        qmask = qmask.fillna(0) > 0
+        self.quantile_mask_df = qmask
+
+    def apply(self, x: np.ndarray | torch.Tensor, tissue_id: str, measured_mask: np.ndarray, selected_mask: np.ndarray) -> Tuple[torch.Tensor, np.ndarray]:
+        assert self.quantile_df is not None
+        x_t = self._ensure_tensor(x)
+        x_t, refined = self._refine_and_slice(x_t, tissue_id, measured_mask, selected_mask)
+        clip_vals = self.quantile_df.loc[tissue_id].values[measured_mask][refined]
+        clip_t = torch.from_numpy(clip_vals).float()[:, None, None]
+        min_t = torch.zeros_like(clip_t)
+        x_t = torch.clamp(x_t, min=min_t, max=clip_t) / clip_t
+        x_t = self._apply_optional_filters(x_t)
+        return x_t, refined
+
+
+class Q99MeanStdNormalizer(BaseNormalizer):
+    """
+    Clip to per-image q99, then standardize using per-image means/stds.
+    """
+
+    def __init__(
+        self,
+        *,
+        modality_dir: str | Path,
+        channels_per_image: pd.DataFrame,
+        quantile_path: str | Path,
+        means_path: str | Path,
+        stds_path: str | Path,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            name="q99_mean_std",
+            modality_dir=modality_dir,
+            channels_per_image=channels_per_image,
+            **kwargs,
+        )
+        base = Path(modality_dir)
+        self.quantile_df = pd.read_csv(base / quantile_path, index_col=0)
+        self.means_df = pd.read_csv(base / means_path, index_col=0)
+        self.stds_df = pd.read_csv(base / stds_path, index_col=0)
+
+        q = self.quantile_df.reindex(index=self.channels_per_image.index, columns=self.channels_per_image.columns)
+        self.quantile_mask_df = (q.fillna(0) > 0)
+
+    def apply(self, x: np.ndarray | torch.Tensor, tissue_id: str, measured_mask: np.ndarray, selected_mask: np.ndarray) -> Tuple[torch.Tensor, np.ndarray]:
+        assert self.quantile_df is not None
+        x_t = self._ensure_tensor(x)
+        x_t, refined = self._refine_and_slice(x_t, tissue_id, measured_mask, selected_mask)
+
+        clip_vals = self.quantile_df.loc[tissue_id].values[measured_mask][refined]
+        clip_t = torch.from_numpy(clip_vals).float()[:, None, None]
+        min_t = torch.zeros_like(clip_t)
+        x_t = torch.clamp(x_t, min=min_t, max=clip_t)
+
+        mean_vals = self.means_df.loc[tissue_id].values[measured_mask][refined]
+        std_vals = self.stds_df.loc[tissue_id].values[measured_mask][refined]
+        mean_t = torch.from_numpy(mean_vals).float()[:, None, None]
+        std_t = torch.from_numpy(std_vals).float()[:, None, None]
+        x_t = (x_t - mean_t) / std_t
+        x_t = self._apply_optional_filters(x_t)
+        return x_t, refined
+
+
+# Legacy; To be removed
+# # ---------------------
+# # Factory / Registry API
+# # ---------------------
+
+# NormalizerCls = Type[BaseNormalizer]
+
+# NORMALIZER_REGISTRY: Dict[str, NormalizerCls] = {
+#     "raw": RawNormalizer,
+#     "global_std": GlobalStdNormalizer,
+#     "approx_global_std": ApproxGlobalStdNormalizer,
+#     "tm_local_q_global_std": TMLocalQGlobalStdNormalizer,
+#     "tm_local_q_rescale_global_std": TMLocalQRescaleGlobalStdNormalizer,
+#     "q_99": Q99Normalizer,
+#     "q99_mean_std": Q99MeanStdNormalizer,
+#     # Both focused and global variants map to the same implementation; the
+#     # correct means/stds file paths should be provided via metadata.
+#     "log_compress_fg_0.99": LogCompressFG099Normalizer,
+#     "global_log_compress_fg_0.99": LogCompressFG099Normalizer,
+# }
+
+
+def build_normalizer(
+    *,
+    normalization: str,
+    crop_size: int,
+    modality_dir: str | Path,
+    channels_per_image: pd.DataFrame,
+    apply_gaussian: bool = False,
+    apply_median: bool = False,
+    gaussian_blur: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+    median_filter_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+    disable_quantile_mask: bool = False,
+    append_suffix_to_crop: bool = False,
+) -> Tuple["BaseNormalizer", Dict[str, str]]:
+    """
+    Unified factory that merges get_normalize_metadata(...) and
+    build_normalizer_from_metadata(...).
+
+    Returns:
+        normalizer: instantiated BaseNormalizer
+        info: {
+            "crop_folder_name": <str>,
+            "channel_file_name": <str>,
+        }
+    """
+
+    # Preserve prior behavior for 'no_overlap_' crop strategies
+
+    # Common kwargs for all normalizers
+    kwargs_common = dict(
+        modality_dir=modality_dir,
+        channels_per_image=channels_per_image,
+        apply_gaussian=apply_gaussian,
+        apply_median=apply_median,
+        gaussian_blur=gaussian_blur,
+        median_filter_fn=median_filter_fn,
+        disable_quantile_mask=disable_quantile_mask,
+    )
+
+    norm = normalization.strip()
+
+    # Config derived from your corrected metadata mapping
+    cfg: Dict[str, Dict[str, str]] = {
+        "global_std": {
+            "crop_suffix": "",
+            "channel_file_name": "channels",
+            "mean_name": "mean",
+            "std_name": "std",
+            # default if not present in legacy metadata
+            "quantile_path": "quantiles/q99.csv",
+            "ctor": "GlobalStdNormalizer",
+        },
+        "tm_local_q_global_std": {
+            "crop_suffix": "_no_log",
+            "channel_file_name": "channels",
+            "means_path": "quantiles/tm_clip99/global_level_means.csv",
+            "stds_path": "quantiles/tm_clip99/global_level_stds.csv",
+            "quantile_path": "quantiles/tm_clip99/image_level_quantiles.csv",
+            "ctor": "TMLocalQGlobalStdNormalizer",
+        },
+        "q99_mean_std": {
+            "crop_suffix": "_no_log",
+            "channel_file_name": "channels",
+            "means_path": "quantiles/0.99/means.csv",
+            "stds_path": "quantiles/0.99/stds.csv",
+            "quantile_path": "quantiles/0.99/quantiles.csv",
+            "ctor": "Q99MeanStdNormalizer",
+        },
+        # Back-compat alias: behave like global_std but force q99 table path
+        "q_99": {
+            "crop_suffix": "_no_log",
+            "channel_file_name": "channels",
+            "mean_name": "mean",
+            "std_name": "std",
+            "quantile_path": "quantiles/q99.csv",
+            "ctor": "GlobalStdNormalizer",
+        },
+        "identity": {
+            "crop_suffix": "",
+            "channel_file_name": "channels",
+            "ctor": "IdentityNormalizer",
+        },
+    }
+
+    if norm == "he":
+        # Keep explicit to avoid silently constructing a multiplex normalizer
+        raise NotImplementedError(
+            "H&E normalization ('he') is handled separately (no multiplex normalizer to build)."
+        )
+
+    if norm not in cfg:
+        raise NotImplementedError(f"Normalization '{norm}' not implemented")
+
+    c = cfg[norm]
+    channel_file_name = c["channel_file_name"]
+    ctor_name = c["ctor"]
+
+    # Resolve constructor
+    ctor_map = {
+        "GlobalStdNormalizer": GlobalStdNormalizer,
+        "TMLocalQGlobalStdNormalizer": TMLocalQGlobalStdNormalizer,
+        "Q99MeanStdNormalizer": Q99MeanStdNormalizer,
+        "Q99Normalizer": Q99Normalizer,
+        "IdentityNormalizer": IdentityNormalizer,
+    }
+    ctor = ctor_map[ctor_name]
+
+    # Instantiate with the appropriate signature
+    if ctor in (GlobalStdNormalizer,):
+        normalizer = ctor(
+            channel_file_name=channel_file_name,
+            mean_name=c["mean_name"],
+            std_name=c["std_name"],
+            quantile_path=c.get("quantile_path", "quantiles/q99.csv"),
+            **kwargs_common,
+        )
+    elif ctor in (
+        TMLocalQGlobalStdNormalizer,
+        Q99MeanStdNormalizer,
+    ):
+        normalizer = ctor(
+            quantile_path=c["quantile_path"],
+            means_path=c["means_path"],
+            stds_path=c["stds_path"],
+            **kwargs_common,
+        )
+    elif ctor in (Q99Normalizer, IdentityNormalizer):
+        normalizer = ctor(
+            quantile_path=c.get("quantile_path", "quantiles/q99.csv"),
+            **kwargs_common,
+        )
+    else:
+        raise RuntimeError(f"Unknown constructor '{ctor_name}'")
+
+    return normalizer
