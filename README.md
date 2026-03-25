@@ -139,7 +139,3 @@ Build the API docs locally:
 pip install -e ".[docs]"
 cd docs && make html
 ```
-
-## License
-
-MIT
