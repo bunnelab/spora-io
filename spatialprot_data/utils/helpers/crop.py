@@ -1,17 +1,9 @@
-from numpy.core.defchararray import mod
 import sys
+
 import numpy as np
 from dataclasses import dataclass
 from typing import Optional
 from tqdm import tqdm
-from pathlib import Path
-import os
-from spatialprot_data.datasets.he import HEImagingDataset
-from spatialprot_data.datasets.multiplex import MultiplexImagingDataset
-
-
-VALID_MODALITIES = ["he", "imc", "codex", "cycif"]
-DATASET_DIR = Path("/mnt/aimm/scratch/datasets_v2/")
 
 
 @dataclass
@@ -323,111 +315,6 @@ def best_mask_tiling_try_to_stop(
     }
 
     return selected_tiles, stats, covered_mask
-
-
-
-
-if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print(f"Usage: {sys.argv[0]} <dataset_name> <crop_size> <modality (optional)>", file=sys.stderr)
-        sys.exit(1)
-    dataset_name = sys.argv[1]
-    crop_size = int(sys.argv[2])
-    modality = sys.argv[3] if len(sys.argv) > 3 else None
-
-    valid_modalities = [m for m in VALID_MODALITIES if (DATASET_DIR / dataset_name / m).is_dir()] if modality is None else [modality] if modality in VALID_MODALITIES else []
-    if not valid_modalities:
-        print(f"Error: No valid modalities found for dataset '{dataset_name}' in {DATASET_DIR}.", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"Found valid modalities for dataset '{dataset_name}': {valid_modalities}")
-
-    for modality in valid_modalities:
-        tissue_mask_path = DATASET_DIR / dataset_name / "segmentations" / modality / "tissue_masks" / "1_0mpp"
-
-        if os.path.exists(tissue_mask_path) and len(os.listdir(tissue_mask_path)) > 0:
-            print(f"Processing modality '{modality}' for dataset '{dataset_name}'...")
-        else:
-            print(f"Warning: No tissue masks found for modality '{modality}' in dataset '{dataset_name}' at {tissue_mask_path}. Skipping.", file=sys.stderr)
-            continue            
-
-        if modality == "he":
-            dataset = HEImagingDataset(
-                name=dataset_name,
-                path=DATASET_DIR / dataset_name,
-                verbose=True,
-                resolution=1.0,
-                crop_size=0
-            )
-        elif modality in ["imc", "codex", "cycif"]:
-            dataset = MultiplexImagingDataset(
-                name=dataset_name,
-                modality=modality,
-                path=DATASET_DIR / dataset_name,
-                verbose=True,
-                resolution=1.0,
-                crop_size=0,
-                normalization="identity",
-            )
-
-        else:
-            raise ValueError(f"Unsupported modality '{modality}' for dataset '{dataset_name}'.")
-
-
-        tids = dataset.get_tissue_ids()
-        tissue_mask_frac = {}
-        tissue_mask_coverage = {}
-        tissue_mask_num_tiles = {}
-        tile_coordinates = {}
-        for tid in tqdm(tids, desc=f"Processing tissues for modality '{modality}'", unit="tissue"):
-            tissue_mask = dataset.get_tissue_mask(tid)
-            tissue_mask_frac[tid] = float(tissue_mask.mask.mean())
-            tiles, stats, covered = best_mask_tiling_try_to_stop(
-                mask=tissue_mask.mask,
-                tile_size=crop_size,
-                stride=crop_size // 2,
-                tolerance=0.85,
-                coverage_goal=1,
-                min_gain_ratio=0.05,
-                allow_overlap=True,
-                progress=True,
-                progress_desc=f"Tiling tissue {tid}",
-            )
-            tissue_mask_coverage[tid] = stats["coverage_ratio"]
-            tissue_mask_num_tiles[tid] = stats["num_tiles"]
-            for tile in tiles:
-                tile_coordinates.setdefault(tid, []).append((tile.y, tile.x))
-
-        print(f"Summary for modality '{modality}' in dataset '{dataset_name}':")
-        print(f"  Tissue mask fraction (mean ± std): {np.mean(list(tissue_mask_frac.values())):.4f} ± {np.std(list(tissue_mask_frac.values())):.4f}")
-        print(f"  Tissue mask coverage after tiling (mean ± std): {np.mean(list(tissue_mask_coverage.values())):.4f} ± {np.std(list(tissue_mask_coverage.values())):.4f}")
-        print(f"  Tissue mask number of tiles (mean ± std): {np.mean(list(tissue_mask_num_tiles.values())):.2f} ± {np.std(list(tissue_mask_num_tiles.values())):.2f}")
-
-        # dataframe with index: tid, columns: mask_frac_{crop_size}, coverage_{crop_size}, num_tiles_{crop_size}
-        # check if it exists, if yes, load it and update it, if no, create it
-        import pandas as pd
-        df_path = DATASET_DIR / dataset_name / "metadata" / f"crop_tiling" / f"{dataset.resolution}" / "tiling_stats.parquet"
-        if df_path.exists():
-            df = pd.read_parquet(df_path)
-        else:
-            os.makedirs(df_path.parent, exist_ok=True)
-            df = pd.DataFrame(index=tids)
-            df['tissue_mask_frac'] = pd.Series(tissue_mask_frac)
-        # add/update columns for this modality and crop size
-        df[f"{modality}_coverage_{crop_size}"] = pd.Series(tissue_mask_coverage)
-        df[f"{modality}_num_tiles_{crop_size}"] = pd.Series(tissue_mask_num_tiles)
-        df.to_parquet(df_path)
-
-        # save coords
-        os.makedirs(DATASET_DIR / dataset_name / "segmentations" / modality / "crop_coordinates" / f"{dataset.resolution}", exist_ok=True)
-        import json
-        with open(DATASET_DIR / dataset_name / "segmentations" / modality / "crop_coordinates" / f"{dataset.resolution}" / f"{crop_size}_tiles_coordinates.json", "w") as f:
-            json.dump(tile_coordinates, f)
-
-
-        
-
-
 
 
 

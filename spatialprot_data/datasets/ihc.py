@@ -30,7 +30,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
 
     def __init__(self,
                  name: str,
-                 path: str,
+                 path: os.PathLike | str,
                  marker_name: str,
                  resolution: float | str,
                  crop_size: int, 

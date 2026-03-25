@@ -1,6 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass
 from typing import get_args, Any, Union, Protocol, Dict
-from dataclasses import is_dataclass, dataclass
 import torch
 import numpy as np
 from numpy.typing import NDArray
@@ -17,8 +16,12 @@ class HEModality:
 @dataclass(kw_only=True)
 class IHCModality:
     """Modality class to represent the IHC modality."""
-    name: str = "ihc" 
-    canonical_dir: str = f"ihc/{name}"
+    name: str = "ihc"
+    canonical_dir: str = ""
+
+    def __post_init__(self):
+        if not self.canonical_dir:
+            self.canonical_dir = f"ihc/{self.name}"
 
 @dataclass(kw_only=True)
 class IMCModality:
