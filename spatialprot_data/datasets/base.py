@@ -6,7 +6,7 @@ from loguru import logger
 import pandas as pd
 from numpy.typing import NDArray
 from typing import Any, Union, Tuple, Sequence, Callable, Optional
-
+import json
 
 from spatialprot_data.datasets._types import get_modality_from_str, is_valid_modality_instance, ModKey, Tissue, \
                                             TissueMask, CellMask
@@ -238,8 +238,35 @@ class BaseImagingDataset(ABC):
         return [self.get_tissue(tissue_id, kind=kind, preprocess=preprocess, image_mode=image_mode) for tissue_id in tissue_ids]
 
 
+    def _try_to_load_crop_coords(self):
+        # crop coordinates
+        crop_coords_path = self.path / "segmentations" / self.modality.name / "crop_coordinates" / self.resolution / f"{self.crop_size}_tiles_coordinates.json"
+        if crop_coords_path.exists():
+            self.crop_coordinates = json.load(crop_coords_path.open())
+            if self.verbose:
+                print_verbose(f"Loaded crop coordinates from {crop_coords_path}")
+        else:
+            self.crop_coordinates = None
+            if self.verbose:
+                print_verbose(f"No crop coordinates found at {crop_coords_path}. get_crop will return random crops.", level="WARNING")
 
+        crop_count = self._count_crops()
+        if self.verbose:
+            print_verbose(f"Dataset {self.name} has {crop_count} crops of size {self.crop_size} at resolution {self.resolution}.",
+                          level="DEBUG" if crop_count > 0 else "WARNING")
 
+    def _count_crops(self) -> int:
+        """
+        Count the number of crops in the dataset.
+        Args:
+            crop_folder_path (str | None): The path to the crop folder. If None, uses the default crop folder.
+        Returns:
+            int: The number of crops in the dataset.
+        """
+        if self.crop_coordinates is not None:
+            return sum(len(coords) for coords in self.crop_coordinates.values())
+        else:
+            return 0
 
 
 

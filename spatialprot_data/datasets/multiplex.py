@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 from typing import List, Tuple
 import zarr
+import json
 
 from spatialprot_data.datasets.base import BaseImagingDataset
 from spatialprot_data.utils.dataset.normalize import build_normalizer
@@ -102,6 +103,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             print_verbose(f"Using Multiplex normalization: {self.normalizer.__class__.__name__}")
         # generating marker indices
         self._index_channel_embeddings()
+        self._try_to_load_crop_coords()
 
     def _set_optional_filters(self, filter_list: List[str], filter_params: dict = {}) -> None:
         """
@@ -335,11 +337,13 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Returns:
             MultiplexTissue: The specific crop as an MultiplexTissue instance.
         """
-        # Currently it is a placeholder function, since we don't pre-generate the crops
-        # Instead we can just get a random crop
-        C, H, W = self._get_tissue_size(tissue_id)
-        x = np.random.randint(0, W - self.crop_size)
-        y = np.random.randint(0, H - self.crop_size)
+        if self.crop_coordinates is None: # fallback
+            C, H, W = self._get_tissue_size(tissue_id)
+            x = np.random.randint(0, W - self.crop_size)
+            y = np.random.randint(0, H - self.crop_size)
+        else:
+            x, y = self.crop_coordinates[tissue_id][crop_id]
+
         if kind == "complete":
             crop = self._get_crop_all_channels(tissue_id, x, y)
         elif kind == "qc_filtered":
@@ -440,12 +444,3 @@ class MultiplexImagingDataset(BaseImagingDataset):
             channel_idxs=self.get_channel_indices(tissue_id, kind="filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask)
         )
 
-    def _count_crops(self, crop_folder_path: str | None = None) -> int:
-        """
-        Count the number of crops in the dataset.
-        Args:
-            crop_folder_path (str | None): The path to the crop folder. If None, uses the default crop folder.
-        Returns:
-            int: The number of crops in the dataset.
-        """
-        return 0

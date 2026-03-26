@@ -1,6 +1,6 @@
 # spatialprot-data
 
-Data structures and loaders for spatial proteomics datasets. Provides a unified interface for loading and working with multi-modal imaging data including H&E, IHC, IMC, CODEX, and CycIF.
+Data structures and loaders for spatial proteomics datasets. Provides a unified interface for loading and working with multi-modal imaging data including H&E, immunohistochemistry (IHC), as well as spatial proteomics technologies such as IMC, CODEX, Orion, and CycIF.
 
 ## Installation
 

@@ -64,6 +64,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         else:
             raise ValueError(f"Invalid mean_std_type {self.mean_std_type}. Valid options are 'imagenet' and 'hibou'.")
 
+        self._try_to_load_crop_coords()
 
     def _get_tissue_all_channels(self, tissue_id: str, preprocess: bool=False, image_mode: str = "CHW") -> IHCTissue:
         """
@@ -141,12 +142,12 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         Returns:
             IHCTissue: The specific crop as an IHCTissue instance.
         """
-        # Currently it is a placeholder function, since we don't pre-generate the crops
-        # Instead we can just get a random crop
-        C, H, W = self._get_tissue_size(tissue_id)  
-        # get random crop_size x crop_size crop from H,W
-        x = np.random.randint(0, W - self.crop_size)
-        y = np.random.randint(0, H - self.crop_size)
+        if self.crop_coordinates is None: # fallback
+            C, H, W = self._get_tissue_size(tissue_id)
+            x = np.random.randint(0, W - self.crop_size)
+            y = np.random.randint(0, H - self.crop_size)
+        else:
+            x, y = self.crop_coordinates[tissue_id][crop_id]
         crop = torch.from_numpy(
             zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[y:y+self.crop_size, x:x+self.crop_size, :] # type: ignore
         ).float()
@@ -162,15 +163,6 @@ class SingleIHCImagingDataset(BaseImagingDataset):
             kind="crop"
         )
     
-    def _count_crops(self, crop_folder_path: str | Path | None=None) -> int:
-        """
-        Count the number of crops in the dataset.
-        Args:
-            crop_folder_path (str | None): The path to the crop folder. If None, uses the default crop folder.
-        Returns:
-            int: The number of crops in the dataset.
-        """
-        raise NotImplementedError("Crops are not pre-generated for H&E datasets, so this function is not implemented.")
 
 
 
