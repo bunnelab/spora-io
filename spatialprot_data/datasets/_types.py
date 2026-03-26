@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, is_dataclass
 from typing import get_args, Any, Union, Protocol, Dict
 import torch
@@ -123,10 +125,6 @@ class ComposedTissue:
     """ComposedTissue class to represent a tissue sample composed of multiple modalities."""
     tissue_id: str
     modalities: Dict[str, Tissue]
-    
-
-
-
 
 
 

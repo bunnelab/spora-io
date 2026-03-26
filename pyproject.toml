@@ -5,13 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "spatialprot-data"
 version = "0.1.0"
-description = "Data structures and loaders for spatial proteomics datasets"
+description = "Data structures and loaders for histopathology and spatial proteomics datasets."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
+    {name = "Charlotte Bunne", email = "charlotte.bunne@epfl.ch"},
     {name = "Eeshaan Jain", email = "eeshaan.jain@epfl.ch"},
     {name = "Lukas Klein", email = "lukas.klein@epfl.ch"},
+    {name = "Benedikt von Querfurth", email = "benedikt.edlervonquerfurth@epfl.ch"},
+    {name = "Johann Wenckstern", email = "johann.wenckstern@epfl.ch"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

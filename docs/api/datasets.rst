@@ -15,7 +15,7 @@ H&E
    :members:
    :show-inheritance:
 
-Multiplex (IMC / CODEX / CycIF)
+Multiplex (IMC, CODEX, CycIF, etc.)
 --------------------------------
 
 .. autoclass:: spatialprot_data.MultiplexImagingDataset

@@ -11,9 +11,17 @@ IHC, IMC, CODEX, and CycIF.
 
    installation
    quickstart
+   concepts
 
 .. toctree::
    :maxdepth: 2
    :caption: API Reference
 
    api/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Additional
+
+   examples
+   changelog

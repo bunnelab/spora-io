@@ -30,7 +30,7 @@ def print_verbose(msg, level="INFO") -> None:
             logger.info(msg)
 
 def set_seed(seed: int | None, omit_random: bool=False, omit_numpy: bool=False, omit_torch: bool=False, set_cudnn_deterministic: bool=True,
-             set_cudnn_benchmark: bool = False, use_determinstic_algorithms: bool = False) -> None:
+             set_cudnn_benchmark: bool = False, use_deterministic_algorithms: bool = False) -> None:
     """
     Configure the seed settings for reproducibility.
     Args:
@@ -40,7 +40,7 @@ def set_seed(seed: int | None, omit_random: bool=False, omit_numpy: bool=False, 
         omit_torch (bool): If True, do not set the seed for torch.
         set_cudnn_deterministic (bool): If True, sets torch.backends.cudnn.deterministic to True.
         set_cudnn_benchmark (bool): If True, sets torch.backends.cudnn.benchmark to True.
-        use_determinstic_algorithms (bool): If True, enables the use of deterministic algorithms in PyTorch.
+        use_deterministic_algorithms (bool): If True, enables the use of deterministic algorithms in PyTorch.
     """
     if seed is None:
         if is_rank0():
@@ -63,7 +63,7 @@ def set_seed(seed: int | None, omit_random: bool=False, omit_numpy: bool=False, 
     if set_cudnn_benchmark:
         torch.backends.cudnn.benchmark = True
 
-    if use_determinstic_algorithms:
+    if use_deterministic_algorithms:
         torch.use_deterministic_algorithms(True, warn_only=True)
 
 

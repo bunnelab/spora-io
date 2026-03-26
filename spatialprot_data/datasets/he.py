@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from typing import Tuple
 import torch
@@ -32,10 +34,11 @@ class HEImagingDataset(BaseImagingDataset):
                  name: str,
                  path: os.PathLike | str,
                  resolution: float | str,
-                 crop_size: int, 
+                 crop_size: int,
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
-                 mean_std_type: str = "imagenet"
+                 mean_std_type: str = "imagenet",
+                 **kwargs
     ):
         super().__init__(
             name=name,
@@ -44,6 +47,7 @@ class HEImagingDataset(BaseImagingDataset):
             resolution=resolution,
             load_cell_metadata=load_cell_metadata,
             verbose=verbose,
+            **kwargs,
         )
         self.mean_std_type = mean_std_type
         self.crop_size = crop_size

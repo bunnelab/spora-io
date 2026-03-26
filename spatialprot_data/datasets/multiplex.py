@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import torch
 import numpy as np
@@ -38,8 +40,9 @@ class MultiplexImagingDataset(BaseImagingDataset):
                  **kwargs
     ):
         assert modality in self.VALID_MODALITIES, f"Invalid modality {modality}. Valid options are: {self.VALID_MODALITIES}"
+        label_kwargs = {k: kwargs.pop(k) for k in list(kwargs) if k in ("label", "labels_to_keep", "label_modifying_fn", "label_type")}
         super().__init__(name=name, path=path, modality=modality,
-                         resolution=resolution, load_cell_metadata=load_cell_metadata, verbose=verbose)
+                         resolution=resolution, load_cell_metadata=load_cell_metadata, verbose=verbose, **label_kwargs)
         self.crop_size = crop_size
         self.kwargs = kwargs
         marker_embedding_dir = self.path.parent / "marker_embeddings"

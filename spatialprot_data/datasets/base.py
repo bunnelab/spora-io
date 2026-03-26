@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -163,20 +165,29 @@ class BaseImagingDataset(ABC):
             Tissue: The crop image as a Tissue instance.
         """
 
-    def get_cell_instance_mask(self, tissue_id: str) -> CellMask:
+    def get_cell_instance_mask(self, tissue_id: str, match_tissue_resolution: bool = False) -> CellMask:
         """
         Get the cell instance mask for a given tissue id.
         Args:
-            tissue_id (str): The tissue ID to retrieve the cell instance mask for. 
+            tissue_id (str): The tissue ID to retrieve the cell instance mask for.
+            match_tissue_resolution (bool): If True, downsample the mask to match
+                the dataset's working resolution using nearest-neighbor interpolation.
+                Default is False (return at native resolution).
         Returns:
             CellMask: The cell instance mask as a CellMask instance.
-        
+
         """
         ci_mask_path = self.path / "segmentations" / self.modality.canonical_dir / "cell_masks" / "instances" / f"{tissue_id}.npz"
         if not ci_mask_path.exists():
             raise ValueError(f"Cell instance mask file {ci_mask_path} does not exist for tissue_id {tissue_id}.")
+        mask = np.load(ci_mask_path)["mask"]
+        if match_tissue_resolution:
+            target_h, target_w = self._get_tissue_size(tissue_id, image_mode="CHW")[1:]
+            if mask.shape != (target_h, target_w):
+                from PIL import Image
+                mask = np.array(Image.fromarray(mask).resize((target_w, target_h), Image.NEAREST))
         return CellMask(
-            mask=np.load(ci_mask_path)["mask"],
+            mask=mask,
             tissue_id=tissue_id
         )
     

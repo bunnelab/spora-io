@@ -22,29 +22,6 @@ Normalization
    :members:
    :show-inheritance:
 
-Channel Selection
------------------
-
-.. autoclass:: spatialprot_data.utils.dataset.DropChannelsFraction
-   :members:
-   :show-inheritance:
-
-.. autoclass:: spatialprot_data.utils.dataset.DropChannelsFixedNumber
-   :members:
-   :show-inheritance:
-
-.. autoclass:: spatialprot_data.utils.dataset.DropChannelsFixedNumberRange
-   :members:
-   :show-inheritance:
-
-.. autoclass:: spatialprot_data.utils.dataset.DropChannelsNuclearKnown
-   :members:
-   :show-inheritance:
-
-.. autoclass:: spatialprot_data.utils.dataset.HierarchicalChannelSampling
-   :members:
-   :show-inheritance:
-
 Image Transforms
 ----------------
 
