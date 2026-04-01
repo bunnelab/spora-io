@@ -11,3 +11,4 @@ build/
 .env
 .pytest_cache/
 docs/_build/
+tmp/

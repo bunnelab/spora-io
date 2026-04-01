@@ -342,17 +342,17 @@ class MultiplexImagingDataset(BaseImagingDataset):
         """
         if self.crop_coordinates is None: # fallback
             C, H, W = self._get_tissue_size(tissue_id)
-            x = np.random.randint(0, W - self.crop_size)
-            y = np.random.randint(0, H - self.crop_size)
+            col = np.random.randint(0, W - self.crop_size)
+            row = np.random.randint(0, H - self.crop_size)
         else:
-            x, y = self.crop_coordinates[tissue_id][crop_id]
+            row, col = self.crop_coordinates[tissue_id][crop_id]
 
         if kind == "complete":
-            crop = self._get_crop_all_channels(tissue_id, x, y)
+            crop = self._get_crop_all_channels(tissue_id, col, row)
         elif kind == "qc_filtered":
-            crop = self._get_crop_qc_filtered(tissue_id, x, y)
+            crop = self._get_crop_qc_filtered(tissue_id, col, row)
         elif kind == "filtered":
-            crop = self._get_crop_filtered(tissue_id, x, y)
+            crop = self._get_crop_filtered(tissue_id, col, row)
         else:
             raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'filtered'.")
 

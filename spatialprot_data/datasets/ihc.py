@@ -146,12 +146,12 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         """
         if self.crop_coordinates is None: # fallback
             C, H, W = self._get_tissue_size(tissue_id)
-            x = np.random.randint(0, W - self.crop_size)
-            y = np.random.randint(0, H - self.crop_size)
+            col = np.random.randint(0, W - self.crop_size)
+            row = np.random.randint(0, H - self.crop_size)
         else:
-            x, y = self.crop_coordinates[tissue_id][crop_id]
+            row, col = self.crop_coordinates[tissue_id][crop_id]
         crop = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[y:y+self.crop_size, x:x+self.crop_size, :] # type: ignore
+            zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[row:row+self.crop_size, col:col+self.crop_size, :] # type: ignore
         ).float()
         if image_mode == "CHW":
             crop = rearrange(crop, "H W C -> C H W")
