@@ -69,7 +69,7 @@ class MultiplexTissue:
     measured_mask: NDArray[np.bool_] | None
     image_loading_mask: NDArray[np.bool_] | None
     channel_names: NDArray[np.str_] | None = None
-    channel_idxs: NDArray[np.str_] | None = None
+    channel_idxs: torch.Tensor | None = None
 
 @dataclass(kw_only=True)
 class IHCTissue:
