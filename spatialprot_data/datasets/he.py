@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Tuple
+from typing import Optional, Tuple
 import torch
 import numpy as np
 import pandas as pd
@@ -34,10 +34,10 @@ class HEImagingDataset(BaseImagingDataset):
                  name: str,
                  path: os.PathLike | str,
                  resolution: float | str,
-                 crop_size: int,
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
                  mean_std_type: str = "imagenet",
+                 crop_size: Optional[int] = None,
                  **kwargs
     ):
         super().__init__(
@@ -45,12 +45,12 @@ class HEImagingDataset(BaseImagingDataset):
             path=path,
             modality="he",
             resolution=resolution,
+            crop_size=crop_size,
             load_cell_metadata=load_cell_metadata,
             verbose=verbose,
             **kwargs,
         )
         self.mean_std_type = mean_std_type
-        self.crop_size = crop_size
 
         self.img_folder = self.path / self.modality.canonical_dir / self.resolution #type: ignore
         assert self.img_folder.exists(), f"Image folder {self.img_folder} does not exist."

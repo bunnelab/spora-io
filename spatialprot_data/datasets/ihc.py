@@ -48,11 +48,11 @@ class SingleIHCImagingDataset(BaseImagingDataset):
             path=path,
             modality=IHCModality(name=self.marker_name, canonical_dir=f"ihc/{self.marker_name}"), 
             resolution=resolution,
+            crop_size=crop_size,
             load_cell_metadata=load_cell_metadata,
             verbose=verbose,
         )
         self.mean_std_type = mean_std_type
-        self.crop_size = crop_size
 
         self.img_folder = self.path / self.modality.canonical_dir / self.resolution #type: ignore
         assert self.img_folder.exists(), f"Image folder {self.img_folder} does not exist."

@@ -27,17 +27,21 @@ class BaseImagingDataset(ABC):
                  path: os.PathLike | str,
                  modality: ModKey,
                  resolution: float | str,
+                 crop_size: Optional[int] = None,
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
                  label: Optional[str] = None,
                  labels_to_keep: Optional[Sequence[str]] = None, 
                  label_modifying_fn: Optional[Callable] = None,
-                 label_type: str = "classification"
+                 label_type: str = "classification",
                  ):
         self.name = name
         self.path = Path(path)
         self.verbose = verbose
         self.resolution = resolution
+        self.crop_size = crop_size
+        if self.crop_size is None:
+            print_verbose(f"No crop size is provided, cropping functionality will break. Please provide a crop size if you intend to use cropping functionality.", level="WARNING")
         self.label = label 
         self.labels_to_keep = labels_to_keep
         self.label_modifying_fn = label_modifying_fn
@@ -251,6 +255,11 @@ class BaseImagingDataset(ABC):
 
     def _try_to_load_crop_coords(self):
         # crop coordinates
+        if self.crop_size is None:
+            self.crop_coordinates = None
+            if self.verbose:
+                print_verbose(f"No crop size provided, skipping loading of crop coordinates.", level="WARNING")
+            return
         crop_coords_path = self.path / "segmentations" / self.modality.name / "crop_coordinates" / self.resolution / f"{self.crop_size}_tiles_coordinates.json"
         if crop_coords_path.exists():
             self.crop_coordinates = json.load(crop_coords_path.open())

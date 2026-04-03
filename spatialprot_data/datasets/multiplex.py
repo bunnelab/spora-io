@@ -9,12 +9,12 @@ from loguru import logger
 from PIL import Image
 from pathlib import Path
 import pandas as pd
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import zarr
 import json
 
 from spatialprot_data.datasets.base import BaseImagingDataset
-from spatialprot_data.utils.dataset.normalize import build_normalizer
+from spatialprot_data.utils.dataset.standardize import build_standardizer
 from spatialprot_data.utils.utils import print_verbose
 from spatialprot_data.utils.dataset.transforms import FilterFactory
 from spatialprot_data.datasets._types import MultiplexTissue, TissueMask, CellMask
@@ -29,21 +29,26 @@ class MultiplexImagingDataset(BaseImagingDataset):
                  name: str,
                  path: os.PathLike | str,
                  modality: str,
-                 normalization: str, 
+                 standardization: str, 
                  resolution: float | str,
-                 crop_size: int,
+                 crop_size: Optional[int] = None,
                  verbose: bool = True,
                  load_cell_metadata: bool = False,
                  marker_embedding_type: str = "esm",
                  disable_quantile_mask: bool = True,
                  filter_list: List[str] | None = None,
+                 use_mean_std: bool = True,
                  **kwargs
     ):
         assert modality in self.VALID_MODALITIES, f"Invalid modality {modality}. Valid options are: {self.VALID_MODALITIES}"
         label_kwargs = {k: kwargs.pop(k) for k in list(kwargs) if k in ("label", "labels_to_keep", "label_modifying_fn", "label_type")}
-        super().__init__(name=name, path=path, modality=modality,
-                         resolution=resolution, load_cell_metadata=load_cell_metadata, verbose=verbose, **label_kwargs)
-        self.crop_size = crop_size
+        super().__init__(name=name, path=path, 
+                         modality=modality,
+                         resolution=resolution, 
+                         crop_size=crop_size,
+                         load_cell_metadata=load_cell_metadata, 
+                         verbose=verbose, 
+                         **label_kwargs)
         self.kwargs = kwargs
         marker_embedding_dir = self.path.parent / "marker_embeddings"
         self.img_folder = self.path / self.modality.canonical_dir / self.resolution #type: ignore
@@ -94,16 +99,17 @@ class MultiplexImagingDataset(BaseImagingDataset):
         self.image_channel_map.replace(1, True, inplace=True)
 
         
-        self.normalizer = build_normalizer(
-            normalization=normalization,
+        self.standardizer = build_standardizer(
+            standardization=standardization,
             modality_dir=self.path / self.modality.canonical_dir / self.resolution,
             channels_per_image=self.image_channel_map,
             disable_quantile_mask=disable_quantile_mask,
-            filter_factory=self.filter_factory
+            filter_factory=self.filter_factory,
+            use_mean_std=use_mean_std,
         )
-
+    
         if self.verbose:
-            print_verbose(f"Using Multiplex normalization: {self.normalizer.__class__.__name__}")
+            print_verbose(f"Using Multiplex standardization: {self.standardizer.__class__.__name__}")
         # generating marker indices
         self._index_channel_embeddings()
         self._try_to_load_crop_coords()
@@ -135,7 +141,6 @@ class MultiplexImagingDataset(BaseImagingDataset):
         - self.channel_list with columns ["name", "protein_id"]
         - self.uniprot_to_index: Dict[str, int] mapping UniProt ID -> embedding row index
         """
-        # df = self.gene_dict.reset_index(drop=True)
         df = self.channel_list.reset_index(drop=True)
 
         self.idx_series = df[self.channel_list_column].map(self.marker_index_map)
@@ -309,7 +314,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'filtered'.")
 
         if preprocess:
-            img, refined_mask = self.normalizer.apply(tissue.tissue, tissue_id, tissue.measured_mask, tissue.image_loading_mask)
+            img, refined_mask = self.standardizer.apply(tissue.tissue, tissue_id, tissue.measured_mask, tissue.image_loading_mask)
             return MultiplexTissue(
                 tissue=img,
                 tissue_id=tissue_id,
@@ -357,7 +362,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'filtered'.")
 
         if preprocess:
-            img, refined_mask = self.normalizer.apply(crop.tissue, tissue_id, crop.measured_mask, crop.image_loading_mask)
+            img, refined_mask = self.standardizer.apply(crop.tissue, tissue_id, crop.measured_mask, crop.image_loading_mask)
             return MultiplexTissue(
                 tissue=img,
                 tissue_id=tissue_id,

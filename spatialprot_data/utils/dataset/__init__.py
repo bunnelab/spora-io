@@ -1,4 +1,4 @@
-from spatialprot_data.utils.dataset.normalize import build_normalizer
+from spatialprot_data.utils.dataset.standardize import build_standardizer
 from spatialprot_data.utils.dataset.channels import (
     DropChannelsFraction,
     DropChannelsFixedNumber,
