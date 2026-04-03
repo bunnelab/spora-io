@@ -139,7 +139,8 @@ class BaseImagingDataset(ABC):
         if not mask_path.exists():
             print_verbose(f"Tissue mask file {mask_path} does not exist. Returning full mask.",
                             level="WARNING")
-            return TissueMask(mask=np.ones((self._get_tissue_size(tissue_id, image_mode=image_mode)[1], self._get_tissue_size(tissue_id, image_mode=image_mode)[2]), dtype=np.bool_),
+            tissue_size = self._get_tissue_size(tissue_id, image_mode="CHW")
+            return TissueMask(mask=np.ones((tissue_size[1], tissue_size[2]), dtype=np.bool_),
                               tissue_id=tissue_id)
         return TissueMask(
             mask=np.load(mask_path)["mask"],
@@ -260,7 +261,7 @@ class BaseImagingDataset(ABC):
             if self.verbose:
                 print_verbose(f"No crop size provided, skipping loading of crop coordinates.", level="WARNING")
             return
-        crop_coords_path = self.path / "segmentations" / self.modality.name / "crop_coordinates" / self.resolution / f"{self.crop_size}_tiles_coordinates.json"
+        crop_coords_path = self.path / "segmentations" / self.modality.canonical_dir / "crop_coordinates" / self.resolution / f"{self.crop_size}_tiles_coordinates.json"
         if crop_coords_path.exists():
             self.crop_coordinates = json.load(crop_coords_path.open())
             if self.verbose:
