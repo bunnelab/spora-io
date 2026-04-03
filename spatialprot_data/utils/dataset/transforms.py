@@ -35,7 +35,12 @@ def custom_median_filter(input_tensor: torch.Tensor, kernel_size: int = 3, paddi
     
     Returns:
         torch.Tensor: Filtered tensor of the same shape as input
-    """
+    """ 
+    if input_tensor.ndim == 3:
+        input_tensor = input_tensor.unsqueeze(0)  # Add batch dimension if missing
+        SHAPE_ADDED = True
+    else:
+        SHAPE_ADDED = False
     # Ensure kernel_size is odd
     assert kernel_size % 2 == 1, "Kernel size must be odd"
     
@@ -54,7 +59,8 @@ def custom_median_filter(input_tensor: torch.Tensor, kernel_size: int = 3, paddi
     # Compute median along the last dimension (across the kernel)
     # Shape after median: (B, C, H, W)
     filtered = torch.median(patches, dim=-1).values
-    
+    if SHAPE_ADDED:
+        filtered = filtered.squeeze(0)  # Remove batch dimension if it was added
     return filtered
 
 
