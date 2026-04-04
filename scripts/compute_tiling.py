@@ -93,7 +93,7 @@ def main():
                 verbose=True,
                 resolution=resolution,
                 crop_size=0,
-                normalization="identity",
+                standardization="identity",
             )
         else:
             raise ValueError(

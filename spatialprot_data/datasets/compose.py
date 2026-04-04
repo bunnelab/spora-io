@@ -68,8 +68,8 @@ class ComposedImagingDataset:
         for mod in modalities:
             if self.verbose:
                 print_verbose(f"Initializing modality '{mod}'...")
-            key = mod if isinstance(mod, str) else mod.name
-            nominal_key = mod if not mod.startswith("ihc_") else "ihc"
+            key: str = mod if isinstance(mod, str) else mod.name
+            nominal_key = mod if not key.startswith("ihc_") else "ihc"
             self._raw_modality_keys.append(key)
 
             kwargs_common = dict(
@@ -87,14 +87,14 @@ class ComposedImagingDataset:
                 ds = HEImagingDataset(**kwargs_common, **kwargs_extra)
                 self._unimodal[key] = ds
             elif key in {"codex", "imc", "cycif"}:
-                # Normalization is only meaningful for MultiplexImagingDataset
-                normalization = kwargs_extra.pop("normalization", "identity")
-                if normalization == "identity":
-                    print_verbose(f"No normalization will be applied to modality '{key}'. Ensure this is intentional.", level="WARNING")
+                # Standardization is only meaningful for MultiplexImagingDataset
+                standardization = kwargs_extra.pop("standardization", "identity")
+                if standardization == "identity":
+                    print_verbose(f"No standardization will be applied to modality '{key}'. Ensure this is intentional.", level="WARNING")
                 ds = MultiplexImagingDataset(
                     **kwargs_common,
                     modality=key,
-                    normalization=normalization,
+                    standardization=standardization,
                     **kwargs_extra,
                 )
                 self._unimodal[key] = ds
