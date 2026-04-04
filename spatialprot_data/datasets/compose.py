@@ -69,7 +69,7 @@ class ComposedImagingDataset:
             if self.verbose:
                 print_verbose(f"Initializing modality '{mod}'...")
             key: str = mod if isinstance(mod, str) else mod.name
-            nominal_key = mod if not key.startswith("ihc_") else "ihc"
+            nominal_key = key if not key.startswith("ihc_") else "ihc"
             self._raw_modality_keys.append(key)
 
             kwargs_common = dict(
