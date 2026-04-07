@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, is_dataclass
-from typing import get_args, Any, Union, Protocol, Dict
+from typing import get_args, Any, Union, Protocol, Dict, Optional
 import torch
 import numpy as np
 from numpy.typing import NDArray
@@ -69,7 +69,7 @@ class MultiplexTissue:
     measured_mask: NDArray[np.bool_] | None
     image_loading_mask: NDArray[np.bool_] | None
     channel_names: NDArray[np.str_] | None = None
-    channel_idxs: torch.Tensor | None = None
+    uniprot_ids: NDArray[np.object_] | None = None
 
 @dataclass(kw_only=True)
 class IHCTissue:
@@ -96,44 +96,11 @@ class CellMask:
     tissue_id: str
     mapping: Dict[int, str] | None = None
 
-# @dataclass(kw_only=True)
-# class HECrop:
-#     """HECrop class to represent a H&E Crop sample."""
-#     crop: torch.Tensor
-#     tissue_id: str
-#     crop_id: int
-#     channels: str = "RGB"
-
-# @dataclass(kw_only=True)
-# class MultiplexCrop:
-#     """MultiplexCrop class to represent a Multiplex Crop sample."""
-#     crop: torch.Tensor
-#     tissue_id: str
-#     crop_id: int
-#     measured_mask: NDArray[np.bool_] | None
-#     selected_mask: NDArray[np.bool_] | None
-#     channels: NDArray[np.str_] | None = None
-
-# @dataclass(kw_only=True)
-# class IHCCrop:
-#     """IHCCrop class to represent an IHC Crop sample."""
-
-# Crop = HECrop | MultiplexCrop | IHCCrop
-
 @dataclass(kw_only=True)
 class ComposedTissue:
     """ComposedTissue class to represent a tissue sample composed of multiple modalities."""
     tissue_id: str
     modalities: Dict[str, Tissue]
-
-
-
-
-
-
-
-
-
 
 def get_modality_from_str(modality_str: str, union_type: Any = Modality) -> Any:
     """Convert a modality string (case-insensitive) to the appropriate modality instance."""

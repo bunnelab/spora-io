@@ -1,4 +1,5 @@
 from __future__ import annotations
+import deprecated
 
 import os
 import torch
@@ -19,7 +20,6 @@ from spatialprot_data.utils.utils import print_verbose
 from spatialprot_data.utils.dataset.transforms import FilterFactory
 from spatialprot_data.datasets._types import MultiplexTissue, TissueMask, CellMask
 
-
 class MultiplexImagingDataset(BaseImagingDataset):
     """
     Class for handling multiplex imaging datasets.
@@ -34,10 +34,10 @@ class MultiplexImagingDataset(BaseImagingDataset):
                  crop_size: Optional[int] = None,
                  verbose: bool = True,
                  load_cell_metadata: bool = False,
-                 marker_embedding_type: str = "esm",
                  disable_quantile_mask: bool = True,
                  filter_list: List[str] | None = None,
                  use_mean_std: bool = True,
+                 return_uniprot_ids: bool = True,
                  **kwargs
     ):
         assert modality in self.VALID_MODALITIES, f"Invalid modality {modality}. Valid options are: {self.VALID_MODALITIES}"
@@ -49,8 +49,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
                          load_cell_metadata=load_cell_metadata, 
                          verbose=verbose, 
                          **label_kwargs)
+        self.return_uniprot_ids = return_uniprot_ids
         self.kwargs = kwargs
-        marker_embedding_dir = self.path.parent / "marker_embeddings"
         self.img_folder = self.path / self.modality.canonical_dir / self.resolution #type: ignore
 
         self.channel_list = pd.read_parquet(self.path / self.modality.canonical_dir / "channels.parquet")
@@ -60,21 +60,9 @@ class MultiplexImagingDataset(BaseImagingDataset):
             self.channel_list["qc_pass"] = True
         self.quality_control_mask = self.channel_list["qc_pass"].to_numpy(dtype=bool)
 
-        if marker_embedding_type == "esm":
-            from spatialprot_data.utils.dataset.marker import load_esm_marker_embedding_dict
-            esm_model_name = self.kwargs.get("esm_model_name", "esm2_t30_150M_UR50D")
-            dir_name = esm_model_name
-            self.marker_index_map = load_esm_marker_embedding_dict(marker_embedding_dir / dir_name)
-            self.channel_list_column = "uniprot_id"
-        else:
-            raise NotImplementedError(f"Marker embedding type {marker_embedding_type} not implemented. Currently only 'esm' is supported.")
-
-        self.marker_embedding_dir = marker_embedding_dir / dir_name
-
 
         filter_params = self.kwargs.get("filter_params", {})
         self._set_optional_filters(filter_list if filter_list is not None else [], filter_params=filter_params)
-        # Load gene dictionary if provided
         
 
         self.image_channel_map = None
@@ -91,7 +79,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             
             self.image_channel_map = pd.DataFrame(
                 index=self.tissue_metadata.index,
-                columns=self.channel_list[self.channel_list_column].values,
+                columns=self.channel_list["channel_name"].to_numpy(),
             )
             self.image_channel_map.fillna(1, inplace=True)  # Include all channels by default
 
@@ -111,8 +99,29 @@ class MultiplexImagingDataset(BaseImagingDataset):
         if self.verbose:
             print_verbose(f"Using Multiplex standardization: {self.standardizer.__class__.__name__}")
         # generating marker indices
-        self._index_channel_embeddings()
+        self._try_to_create_uniprot_mask()
         self._try_to_load_crop_coords()
+
+    def _try_to_create_uniprot_mask(self):
+        if "uniprot_id" not in self.channel_list.columns:
+            print_verbose(f"No 'uniprot_id' column found in channel list at {self.path / self.modality.canonical_dir / 'channels.parquet'}. uniprot_ids will not be returned.", level="WARNING")
+            self.channel_list["uniprot_id"] = np.nan
+            self.uniprot_mask = np.zeros(len(self.channel_list), dtype=bool)
+            if self.return_uniprot_ids:
+                self.return_uniprot_ids = False
+                print_verbose(f"Setting return_uniprot_ids to False.", level="WARNING")
+            return
+
+        uniprot_regex = r"^[OPQ][0-9][A-Z0-9]{3}[0-9](?:-[0-9]+)?$"
+        has_uniprot_id = self.channel_list["uniprot_id"].astype("string").str.match(uniprot_regex, na=False)
+        self.uniprot_mask = has_uniprot_id.to_numpy(dtype=bool)
+        if self.verbose:
+            print_verbose(f"Uniprot mask created with {self.uniprot_mask.sum()} channels.")
+
+    def _get_uniprot_ids(self, mask: np.ndarray | None) -> NDArray[np.object_] | None:
+        if not self.return_uniprot_ids or mask is None:
+            return None
+        return self.channel_list["uniprot_id"].to_numpy(dtype=object, copy=False)[mask]
 
     def _set_optional_filters(self, filter_list: List[str], filter_params: dict = {}) -> None:
         """
@@ -125,55 +134,6 @@ class MultiplexImagingDataset(BaseImagingDataset):
         """
         self.filter_factory = FilterFactory(filter_list, filter_params=filter_params)
         self.filter_factory.print_filters()
-
-        
-    def _index_channel_embeddings(self) -> None:
-        """
-        Compute:
-        - self.marker_indices: np.int64[ n_with_embed ]
-                Row indices into the embedding matrix (aligned to markers that *have* embeddings).
-        - self.channel_indices_with_embedding: np.int64[ n_with_embed ]
-                Row indices into self.channel_list for which an embedding exists.
-        - self.mask_channels_with_embeddings: np.bool_[ n_all ]
-                Boolean mask over all channels: True iff embedding was found.
-
-        Requires:
-        - self.channel_list with columns ["name", "protein_id"]
-        - self.uniprot_to_index: Dict[str, int] mapping UniProt ID -> embedding row index
-        """
-        df = self.channel_list.reset_index(drop=True)
-
-        self.idx_series = df[self.channel_list_column].map(self.marker_index_map)
-
-        # Boolean mask over *all* channels.
-        mask = self.idx_series.notna().to_numpy(dtype=bool)
-
-        # Channel indices (rows in gene_dict) that *have* embeddings.
-        channel_idxs = np.flatnonzero(mask).astype(np.int64)
-
-        # Embedding matrix row indices aligned to the above channels.
-        # Safe to astype(int) after masking (no NaNs).
-        marker_idxs = self.idx_series[mask].astype(int).to_numpy(dtype=np.int64)
-
-        # Save
-        # boolean mask for which embeddings exist
-        self.mask_channels_with_embeddings = mask
-        # channel indices for which embeddings exist (0..n-1) indexed
-        self.channel_indices_with_embedding = channel_idxs
-        # corresponding embedding row indices for those channels from index map
-        self.marker_indices = marker_idxs
-
-        # Logging
-        if self.verbose:
-            n_all = len(df)
-            n_found = int(mask.sum())
-            n_miss = n_all - n_found
-            print_verbose(f"Found embeddings for {n_found}/{n_all} markers ({n_found/n_all:.1%}).")
-            if n_miss:
-                print_verbose(
-                    f"Embeddings missing for {n_miss} markers.",
-                    level="WARNING"
-                )
 
     def _get_tissue_all_channels(self, tissue_id: str) -> MultiplexTissue:
         """
@@ -190,9 +150,9 @@ class MultiplexImagingDataset(BaseImagingDataset):
             tissue=img,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
-            image_loading_mask=np.ones(measured_mask.sum(), dtype=bool), # for the unfiltered image, all measured channels are loaded
+            image_loading_mask=np.ones(measured_mask.sum(), dtype=bool),
             channel_names=self.get_channel_names(tissue_id, kind="complete", measured_mask=measured_mask),
-            channel_idxs=self.get_channel_indices(tissue_id, kind="complete", measured_mask=measured_mask)
+            uniprot_ids=self.get_uniprot_ids(tissue_id, kind="complete", measured_mask=measured_mask),
         )
     
     def _get_tissue_qc_filtered(self, tissue_id: str) -> MultiplexTissue:
@@ -205,9 +165,6 @@ class MultiplexImagingDataset(BaseImagingDataset):
         """
         img_path = self.img_folder / f"{tissue_id}.zarr"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
-        # qc_mask = self.quality_control_mask & measured_mask
-        # this doesn't work when loading the image because the image has only measured_mask=True channels,
-        # but measured_mask and qc_mask are defined over the full channel set. So we need to apply the measured_mask to the qc_mask to get the correct channels to load from the image.
         image_loading_mask = self.quality_control_mask[measured_mask]
         img = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask)]).float()
         qc_mask = self.quality_control_mask & measured_mask
@@ -217,12 +174,12 @@ class MultiplexImagingDataset(BaseImagingDataset):
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask,
             channel_names=self.get_channel_names(tissue_id, kind="qc_filtered", measured_mask=measured_mask, qc_mask=qc_mask),
-            channel_idxs=self.get_channel_indices(tissue_id, kind="qc_filtered", measured_mask=measured_mask, qc_mask=qc_mask)
+            uniprot_ids=self.get_uniprot_ids(tissue_id, kind="qc_filtered", measured_mask=measured_mask, qc_mask=qc_mask),
         )
     
-    def _get_tissue_filtered(self, tissue_id: str) -> MultiplexTissue:
+    def _get_tissue_uniprot_filtered(self, tissue_id: str) -> MultiplexTissue:
         """
-        Get the tissue image filtered by quality control and embedding availability for a given tissue id.
+        Get the tissue image filtered by quality control and valid UniProt availability for a given tissue id.
         Args:
             tissue_id (str): The tissue ID to retrieve the image for.
         Returns:
@@ -231,20 +188,17 @@ class MultiplexImagingDataset(BaseImagingDataset):
         img_path = self.img_folder / f"{tissue_id}.zarr"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         qc_mask = self.quality_control_mask & measured_mask
-        filtered_mask = self.mask_channels_with_embeddings & qc_mask 
-        # similar to above, we need to apply the measured_mask to the filtered_mask to get the correct channels to load from the image.
+        filtered_mask = self.uniprot_mask & qc_mask
         image_loading_mask = filtered_mask[measured_mask]
         img = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask)]).float()
         return MultiplexTissue(
             tissue=img,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
-            image_loading_mask=image_loading_mask, 
-            channel_names=self.get_channel_names(tissue_id, kind="filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
-            channel_idxs=self.get_channel_indices(tissue_id, kind="filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask)
+            image_loading_mask=image_loading_mask,
+            channel_names=self.get_channel_names(tissue_id, kind="uniprot_filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
+            uniprot_ids=self.get_uniprot_ids(tissue_id, kind="uniprot_filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
         )
-
-
 
 
     def get_channel_names(self, tissue_id: str, kind: str = "complete", 
@@ -253,8 +207,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Get the channel names for a given tissue id and kind.
         Args:
             tissue_id (str): The tissue ID to retrieve the channel names for.
-            kind (str): The kind of tissue image to retrieve channel names for. Default is "complete". Valid options are "complete", "qc_filtered", and "filtered".
-            For H&E datasets, "qc_filtered" and "filtered" will return the same channel names since there is only one modality channel.
+            kind (str): The kind of tissue image to retrieve channel names for. Valid options are "complete", "qc_filtered", and "uniprot_filtered".
         Returns:
             NDArray[np.str_]: The channel names as a 1D array of shape (n_channels,).
         """
@@ -262,70 +215,54 @@ class MultiplexImagingDataset(BaseImagingDataset):
             measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         if kind == "complete":
             return self.channel_list["channel_name"][measured_mask].values
-        elif kind == "qc_filtered":
+        if kind == "qc_filtered":
             if qc_mask is None:
                 qc_mask = self.quality_control_mask & measured_mask
             return self.channel_list["channel_name"][qc_mask].values
-        elif kind == "filtered":
+        if kind == "uniprot_filtered":
             if filtered_mask is None:
                 qc_mask = self.quality_control_mask & measured_mask
-                filtered_mask = self.mask_channels_with_embeddings & qc_mask 
+                filtered_mask = self.uniprot_mask & qc_mask
             return self.channel_list["channel_name"][filtered_mask].values
-        
+        raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
 
-    def get_channel_indices(self, tissue_id: str, kind: str = "complete",
-                            measured_mask=None, qc_mask=None, filtered_mask=None) -> torch.Tensor:
-        """
-        Get the channel indices for a given tissue id and kind. This corresponds to the marker_embedding_type channel indices.
-        For filtered kind, this returns integer indices for channels with embeddings that also pass quality control.
-        For complete and qc_filtered, channels without embeddings are preserved as NaN values in a floating-point tensor.
-        Args:
-            tissue_id (str): The tissue ID to retrieve the channel indices for.
-            kind (str): The kind of tissue image to retrieve channel indices for. Default is "complete". Valid options are "complete", "qc_filtered", and "filtered".
-        Returns:
-           torch.Tensor: The channel indices as a 1D tensor of shape (n_channels,).
-        """
-
+    def get_uniprot_ids(self, tissue_id: str, kind: str = "complete", measured_mask=None, qc_mask=None, filtered_mask=None) -> NDArray[np.object_] | None:
+        if not self.return_uniprot_ids:
+            return None
         if measured_mask is None:
             measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         if kind == "complete":
-            values = self.idx_series[measured_mask].to_numpy()
-        elif kind == "qc_filtered":
+            return self._get_uniprot_ids(measured_mask)
+        if kind == "qc_filtered":
             if qc_mask is None:
                 qc_mask = self.quality_control_mask & measured_mask
-            values = self.idx_series[qc_mask].to_numpy()
-        elif kind == "filtered":
+            return self._get_uniprot_ids(qc_mask)
+        if kind == "uniprot_filtered":
             if filtered_mask is None:
                 qc_mask = self.quality_control_mask & measured_mask
-                filtered_mask = self.mask_channels_with_embeddings & qc_mask
-            values = self.idx_series[filtered_mask].to_numpy(dtype=np.int64)
-            return torch.from_numpy(values)
-        else:
-            raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'filtered'.")
-
-        values = values.astype(np.float32, copy=False)
-        return torch.from_numpy(values)
-
-    def _refine_channel_metadata(
+                filtered_mask = self.uniprot_mask & qc_mask
+            return self._get_uniprot_ids(filtered_mask)
+        raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
+        
+    def  _refine_channel_metadata(
         self,
         image_loading_mask: np.ndarray | None,
         channel_names: NDArray[np.str_] | None,
-        channel_idxs: torch.Tensor | None,
+        uniprot_ids: NDArray[np.object_] | None,
         refined_mask: np.ndarray | None,
-    ) -> tuple[np.ndarray | None, NDArray[np.str_] | None, torch.Tensor | None]:
+    ) -> tuple[np.ndarray | None, NDArray[np.str_] | None, NDArray[np.object_] | None]:
         """Keep metadata aligned with standardized outputs, with a zero-copy fast path when nothing changed."""
         if image_loading_mask is None or refined_mask is None:
-            return image_loading_mask, channel_names, channel_idxs
+            return image_loading_mask, channel_names, uniprot_ids
 
         if refined_mask is image_loading_mask or refined_mask.sum() == image_loading_mask.sum():
-            return image_loading_mask, channel_names, channel_idxs
+            return image_loading_mask, channel_names, uniprot_ids
 
         keep_in_loaded = np.asarray(refined_mask[image_loading_mask], dtype=bool)
         channel_names_out = channel_names[keep_in_loaded] if channel_names is not None else None
-        channel_idxs_out = channel_idxs[torch.from_numpy(keep_in_loaded)] if channel_idxs is not None else None
-        return refined_mask, channel_names_out, channel_idxs_out
-
-    def get_tissue(self, tissue_id: str, kind="filtered", preprocess=True, image_mode="CHW") -> MultiplexTissue:
+        uniprot_ids_out = uniprot_ids[keep_in_loaded] if uniprot_ids is not None else None
+        return refined_mask, channel_names_out, uniprot_ids_out
+    def get_tissue(self, tissue_id: str, kind="uniprot_filtered", preprocess=True, image_mode="CHW") -> MultiplexTissue:
         """ 
         Get the tissue image for a given tissue id, with options for filtering channels and preprocessing.
         """ 
@@ -333,17 +270,17 @@ class MultiplexImagingDataset(BaseImagingDataset):
             tissue = self._get_tissue_all_channels(tissue_id)
         elif kind == "qc_filtered":
             tissue = self._get_tissue_qc_filtered(tissue_id)
-        elif kind == "filtered":
-            tissue = self._get_tissue_filtered(tissue_id)
+        elif kind == "uniprot_filtered":
+            tissue = self._get_tissue_uniprot_filtered(tissue_id)
         else:
-            raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'filtered'.")
+            raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
 
         if preprocess:
             img, refined_mask = self.standardizer.apply(tissue.tissue, tissue_id, tissue.measured_mask, tissue.image_loading_mask)
-            image_loading_mask, channel_names, channel_idxs = self._refine_channel_metadata(
+            image_loading_mask, channel_names, uniprot_ids = self._refine_channel_metadata(
                 tissue.image_loading_mask,
                 tissue.channel_names,
-                tissue.channel_idxs,
+                tissue.uniprot_ids,
                 refined_mask,
             )
             return MultiplexTissue(
@@ -352,10 +289,9 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 measured_mask=tissue.measured_mask,
                 image_loading_mask=image_loading_mask,
                 channel_names=channel_names,
-                channel_idxs=channel_idxs
+                uniprot_ids=uniprot_ids,
             )
-        else:
-            return tissue
+        return tissue
 
     def _get_tissue_size(self, tissue_id: str, image_mode: str = "CHW") -> Tuple[int, int, int]:
         img_path = self.img_folder / f"{tissue_id}.zarr"
@@ -367,7 +303,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
 
 
 
-    def get_crop(self, tissue_id: str, crop_id: int, preprocess=True, kind="filtered") -> MultiplexTissue:
+    def get_crop(self, tissue_id: str, crop_id: int, preprocess=True, kind="uniprot_filtered") -> MultiplexTissue:
         """
         Get a specific crop based on the tissue id and crop id
         Args:
@@ -387,17 +323,17 @@ class MultiplexImagingDataset(BaseImagingDataset):
             crop = self._get_crop_all_channels(tissue_id, col, row)
         elif kind == "qc_filtered":
             crop = self._get_crop_qc_filtered(tissue_id, col, row)
-        elif kind == "filtered":
-            crop = self._get_crop_filtered(tissue_id, col, row)
+        elif kind == "uniprot_filtered":
+            crop = self._get_crop_uniprot_filtered(tissue_id, col, row)
         else:
-            raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'filtered'.")
+            raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
 
         if preprocess:
             img, refined_mask = self.standardizer.apply(crop.tissue, tissue_id, crop.measured_mask, crop.image_loading_mask)
-            image_loading_mask, channel_names, channel_idxs = self._refine_channel_metadata(
+            image_loading_mask, channel_names, uniprot_ids = self._refine_channel_metadata(
                 crop.image_loading_mask,
                 crop.channel_names,
-                crop.channel_idxs,
+                crop.uniprot_ids,
                 refined_mask,
             )
             return MultiplexTissue(
@@ -406,12 +342,11 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 measured_mask=crop.measured_mask,
                 image_loading_mask=image_loading_mask,
                 channel_names=channel_names,
-                channel_idxs=channel_idxs,
+                uniprot_ids=uniprot_ids,
                 kind="crop",
                 crop_id=crop_id
             )
-        else:
-            return crop
+        return crop
         
     
     def _get_crop_all_channels(self, tissue_id: str, crop_x: int, crop_y: int) -> MultiplexTissue:
@@ -431,9 +366,9 @@ class MultiplexImagingDataset(BaseImagingDataset):
             tissue=crop,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
-            image_loading_mask=np.ones(measured_mask.sum(), dtype=bool), # for the unfiltered crop, all measured channels are loaded
+            image_loading_mask=np.ones(measured_mask.sum(), dtype=bool),
             channel_names=self.get_channel_names(tissue_id, kind="complete", measured_mask=measured_mask),
-            channel_idxs=self.get_channel_indices(tissue_id, kind="complete", measured_mask=measured_mask)
+            uniprot_ids=self.get_uniprot_ids(tissue_id, kind="complete", measured_mask=measured_mask),
         )
     
     def _get_crop_qc_filtered(self, tissue_id: str, crop_x: int, crop_y: int) -> MultiplexTissue:
@@ -448,9 +383,6 @@ class MultiplexImagingDataset(BaseImagingDataset):
         """ 
         img_path = self.img_folder / f"{tissue_id}.zarr"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
-        # qc_mask = self.quality_control_mask & measured_mask
-        # this doesn't work when loading the image because the image has only measured_mask=True channels,
-        # but measured_mask and qc_mask are defined over the full channel set. So we need to apply the measured_mask to the qc_mask to get the correct channels to load from the image.
         image_loading_mask = self.quality_control_mask[measured_mask]
         crop = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), crop_y:crop_y+self.crop_size, crop_x:crop_x+self.crop_size]).float()
         qc_mask = self.quality_control_mask & measured_mask
@@ -460,12 +392,12 @@ class MultiplexImagingDataset(BaseImagingDataset):
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask,
             channel_names=self.get_channel_names(tissue_id, kind="qc_filtered", measured_mask=measured_mask, qc_mask=qc_mask),
-            channel_idxs=self.get_channel_indices(tissue_id, kind="qc_filtered", measured_mask=measured_mask, qc_mask=qc_mask)
+            uniprot_ids=self.get_uniprot_ids(tissue_id, kind="qc_filtered", measured_mask=measured_mask, qc_mask=qc_mask),
         )
     
-    def _get_crop_filtered(self, tissue_id: str, crop_x: int, crop_y: int) -> MultiplexTissue:
+    def _get_crop_uniprot_filtered(self, tissue_id: str, crop_x: int, crop_y: int) -> MultiplexTissue:
         """
-        Get the tissue crop filtered by quality control and embedding availability for a given tissue id and crop coordinates.
+        Get the tissue crop filtered by quality control and valid UniProt availability for a given tissue id and crop coordinates.
         Args:
             tissue_id (str): The tissue ID to retrieve the crop for.
             crop_x (int): The x coordinate of the top-left corner of the crop.
@@ -476,8 +408,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         img_path = self.img_folder / f"{tissue_id}.zarr"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         qc_mask = self.quality_control_mask & measured_mask
-        filtered_mask = self.mask_channels_with_embeddings & qc_mask 
-        # similar to above, we need to apply the measured_mask to the filtered_mask to get the correct channels to load from the image.
+        filtered_mask = self.uniprot_mask & qc_mask
         image_loading_mask = filtered_mask[measured_mask]
         crop = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), crop_y:crop_y+self.crop_size, crop_x:crop_x+self.crop_size]).float()
         return MultiplexTissue(
@@ -485,7 +416,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask, 
-            channel_names=self.get_channel_names(tissue_id, kind="filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
-            channel_idxs=self.get_channel_indices(tissue_id, kind="filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask)
+            channel_names=self.get_channel_names(tissue_id, kind="uniprot_filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
+            uniprot_ids=self.get_uniprot_ids(tissue_id, kind="uniprot_filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
         )
 

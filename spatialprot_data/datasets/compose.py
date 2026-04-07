@@ -177,13 +177,13 @@ class ComposedImagingDataset:
         """
         return self._tissue_id_to_modalities[str(tissue_id)]
 
-    def get_unimodal_tissue(self, tissue_id: str, modality: ModKey, kind: str = "filtered", preprocess: bool = True,  image_mode="CHW"):
+    def get_unimodal_tissue(self, tissue_id: str, modality: ModKey, kind: str = "uniprot_filtered", preprocess: bool = True,  image_mode="CHW"):
         """
         Get the tissue image for a given tissue ID and modality, with options for kind of image and preprocessing.
         Args:
             tissue_id (str): The tissue ID to retrieve.
             modality (ModKey): The modality key to specify which unimodal dataset to query.
-            kind (str): The kind of tissue image to retrieve. Default is "filtered". Valid options are "complete", "qc_filtered", and "filtered".
+            kind (str): The kind of tissue image to retrieve. Default is "uniprot_filtered". Valid options are "complete", "qc_filtered", and "uniprot_filtered".
             preprocess (bool): If True, preprocess the image (normalize). Default is True.
             image_mode (str): The desired image mode of the returned tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
         Returns:
@@ -216,14 +216,14 @@ class ComposedImagingDataset:
         ds = self.get_dataset(modality)
         return ds._get_tissue_size(tissue_id)
 
-    def get_unimodal_crop(self, tissue_id: str, crop_id: int, modality: ModKey, kind: str = "filtered", preprocess: bool = True):
+    def get_unimodal_crop(self, tissue_id: str, crop_id: int, modality: ModKey, kind: str = "uniprot_filtered", preprocess: bool = True):
         """
         Get a specific crop for a given tissue ID and modality, with options for kind of image and preprocessing.
         Args:
             tissue_id (str): The tissue ID to retrieve the crop for.
             crop_id (int): The crop ID to retrieve.
             modality (ModKey): The modality key to specify which unimodal dataset to query.
-            kind (str): The kind of tissue image to retrieve the crop from. Default is "filtered". Valid options are "complete", "qc_filtered", and "filtered".
+            kind (str): The kind of tissue image to retrieve the crop from. Default is "uniprot_filtered". Valid options are "complete", "qc_filtered", and "uniprot_filtered".
             preprocess (bool): If True, preprocess the image (normalize) before cropping. Default is True.
         Returns:
             Crop: The crop image as returned by the unimodal dataset's `get_crop` method
@@ -231,13 +231,13 @@ class ComposedImagingDataset:
         ds = self.get_dataset(modality)
         return ds.get_crop(tissue_id, crop_id, kind=kind, preprocess=preprocess)
 
-    def get_composed_tissue(self, tissue_id: str, kind: str = "filtered", preprocess: bool = True, image_mode="CHW") -> ComposedTissue:
+    def get_composed_tissue(self, tissue_id: str, kind: str = "uniprot_filtered", preprocess: bool = True, image_mode="CHW") -> ComposedTissue:
         """
         Get a composed tissue sample for a given tissue ID, which includes all available modalities for that tissue.
 
         Args:
             tissue_id (str): The tissue ID to retrieve.
-            kind (str): The kind of tissue image to retrieve. Default is "filtered". Valid options are "complete", "qc_filtered", and "filtered".
+            kind (str): The kind of tissue image to retrieve. Default is "uniprot_filtered". Valid options are "complete", "qc_filtered", and "uniprot_filtered".
             preprocess (bool): If True, preprocess the images (normalize). Default is True.
             image_mode (str): The desired image mode of the returned tissue images. Valid options are "CHW" and "HWC". Default is "CHW".
 
@@ -255,13 +255,13 @@ class ComposedImagingDataset:
         )
 
 
-    def get_composed_tissue_by_patient(self, patient_id: str, kind: str = "filtered", preprocess: bool = True, image_mode="CHW") -> Sequence[ComposedTissue]:
+    def get_composed_tissue_by_patient(self, patient_id: str, kind: str = "uniprot_filtered", preprocess: bool = True, image_mode="CHW") -> Sequence[ComposedTissue]:
         """
         Get composed tissue samples for all tissues associated with a given patient ID.
 
         Args:
             patient_id (str): The patient ID to retrieve tissues for.
-            kind (str): The kind of tissue image to retrieve. Default is "filtered". Valid options are "complete", "qc_filtered", and "filtered".
+            kind (str): The kind of tissue image to retrieve. Default is "uniprot_filtered". Valid options are "complete", "qc_filtered", and "uniprot_filtered".
             preprocess (bool): If True, preprocess the images (normalize). Default is True.
             image_mode (str): The desired image mode of the returned tissue images. Valid options are "CHW" and "HWC". Default is "CHW".
 
