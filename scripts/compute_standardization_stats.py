@@ -135,12 +135,15 @@ def main():
     logger.info(f"Full method name for saving stats: {method_name}")
 
 
-    method_to_path = {
-        "quantile_clipping": f"standardization/quantile_clipping/{method_name}",
-        "quantile_clipping_log1p": f"standardization/quantile_clipping_log1p/{method_name}",
-    }
+    # method_to_path = {
+    #     "quantile_clipping": f"standardization/quantile_clipping/{method_name}",
+    #     "quantile_clipping_log1p": f"standardization/quantile_clipping_log1p/{method_name}",
+    # }
 
-    quantile_path = method_to_path[base_method]
+    method_to_path = lambda method_name: f"standardization/{method_name}"
+    
+
+    quantile_path = method_to_path(method_name)
 
     dataset_path = dataset_dir / dataset_name / dataset.modality.name / dataset.resolution
 
