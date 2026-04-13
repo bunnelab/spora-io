@@ -78,6 +78,27 @@ def discover_standardization_specs(modality_dir: Path) -> list[str]:
     return sorted(set(specs))
 
 
+def parse_crop_count_map(value: object) -> dict[str, int]:
+    if value is None or value is pd.NA:
+        return {}
+    text = str(value).strip()
+    if not text or text == "-":
+        return {}
+
+    counts: dict[str, int] = {}
+    for item in text.split(","):
+        item = item.strip()
+        if not item or ":" not in item:
+            continue
+        size, count = item.split(":", 1)
+        size = size.strip()
+        try:
+            counts[size] = int(count.strip())
+        except ValueError:
+            continue
+    return counts
+
+
 def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     datasets_dir = get_datasets_dir()
     dataset_rows: list[dict[str, object]] = []
@@ -103,6 +124,7 @@ def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
         dataset_crop_specs = 0
         dataset_std_specs = 0
         dataset_image_files = 0
+        dataset_crop_counts_by_size: dict[str, int] = {}
         resolution_union: set[str] = set()
 
         for modality in loader_modalities:
@@ -147,20 +169,24 @@ def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
             crop_dir = seg_base / "crop_coordinates"
             crop_specs: list[str] = []
             modality_crop_total = 0
+            modality_crop_counts_by_size: dict[str, int] = {}
             if crop_dir.exists():
                 for resolution_dir in sorted(path for path in crop_dir.iterdir() if path.is_dir()):
                     for json_path in sorted(resolution_dir.glob("*.json")):
                         tissues_with_crops, crop_count = summarize_crop_json(json_path)
-                        crop_spec = f"{resolution_dir.name}/{json_path.stem.replace('_tiles_coordinates', '')}"
+                        crop_size = json_path.stem.replace("_tiles_coordinates", "")
+                        crop_spec = f"{resolution_dir.name}/{crop_size}"
                         crop_specs.append(crop_spec)
                         modality_crop_total += crop_count
+                        modality_crop_counts_by_size[crop_size] = modality_crop_counts_by_size.get(crop_size, 0) + crop_count
+                        dataset_crop_counts_by_size[crop_size] = dataset_crop_counts_by_size.get(crop_size, 0) + crop_count
                         crop_rows.append(
                             {
                                 "dataset": dataset_dir.name,
                                 "modality": modality,
                                 "resolution": resolution_dir.name,
                                 "crop_file": json_path.name,
-                                "crop_size": json_path.stem.replace("_tiles_coordinates", ""),
+                                "crop_size": crop_size,
                                 "tissues_with_crops": tissues_with_crops,
                                 "num_crops": crop_count,
                                 "path": str(json_path),
@@ -201,6 +227,7 @@ def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
                     "num_crop_specs": len(crop_specs),
                     "total_crops": modality_crop_total,
                     "crop_specs": ", ".join(crop_specs),
+                    "crop_counts_by_size": ", ".join(f"{size}:{count}" for size, count in sorted(modality_crop_counts_by_size.items())) or "-",
                     "num_standardization_specs": len(std_specs),
                     "standardization_specs": ", ".join(std_specs),
                     "modality_path": str(modality_dir),
@@ -220,6 +247,7 @@ def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
                 "images_best_resolution_total": dataset_image_files,
                 "num_crop_specs": dataset_crop_specs,
                 "total_crops": dataset_total_crops,
+                "crop_counts_by_size": ", ".join(f"{size}:{count}" for size, count in sorted(dataset_crop_counts_by_size.items())) or "-",
                 "num_standardization_specs": dataset_std_specs,
                 "metadata_path": str(metadata_path),
             }
@@ -323,6 +351,10 @@ class SummaryView(Widget):
     }
     """
 
+    def __init__(self, crop_sizes: list[str], **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._crop_sizes = crop_sizes
+
     def compose(self) -> ComposeResult:
         with Horizontal(classes="metrics-row"):
             yield Static("", id="m-datasets", classes="metric-box")
@@ -330,17 +362,29 @@ class SummaryView(Widget):
             yield Static("", id="m-images", classes="metric-box")
             yield Static("", id="m-crops", classes="metric-box")
             yield Static("", id="m-std", classes="metric-box")
+            for crop_size in self._crop_sizes:
+                yield Static("", id=f"m-crop-size-{crop_size}", classes="metric-box")
         yield DataTable(id="summary-table", cursor_type="row")
 
     def refresh_data(self, dataset_df: pd.DataFrame, modality_df: pd.DataFrame) -> None:
         def metric(value: int, label: str) -> str:
             return f"[bold white]{value}[/]\n[dim]{label}[/]"
 
+        crop_totals_by_size = {crop_size: 0 for crop_size in self._crop_sizes}
+        if not dataset_df.empty and "crop_counts_by_size" in dataset_df.columns:
+            for value in dataset_df["crop_counts_by_size"]:
+                for crop_size, count in parse_crop_count_map(value).items():
+                    crop_totals_by_size[crop_size] = crop_totals_by_size.get(crop_size, 0) + count
+
         self.query_one("#m-datasets", Static).update(metric(int(len(dataset_df)), "datasets"))
         self.query_one("#m-modalities", Static).update(metric(int(len(modality_df)), "modalities"))
         self.query_one("#m-images", Static).update(metric(int(dataset_df["images_best_resolution_total"].fillna(0).sum()) if not dataset_df.empty else 0, "images"))
-        self.query_one("#m-crops", Static).update(metric(int(dataset_df["total_crops"].fillna(0).sum()) if not dataset_df.empty else 0, "crops"))
+        self.query_one("#m-crops", Static).update(metric(int(dataset_df["num_crop_specs"].fillna(0).sum()) if not dataset_df.empty else 0, "crop files"))
         self.query_one("#m-std", Static).update(metric(int(dataset_df["num_standardization_specs"].fillna(0).sum()) if not dataset_df.empty else 0, "std specs"))
+        for crop_size in self._crop_sizes:
+            self.query_one(f"#m-crop-size-{crop_size}", Static).update(
+                metric(crop_totals_by_size.get(crop_size, 0), f"{crop_size} crops")
+            )
 
         table = self.query_one("#summary-table", DataTable)
         table.clear(columns=True)
@@ -352,12 +396,21 @@ class SummaryView(Widget):
             "num_modalities",
             "images_best_resolution_total",
             "num_crop_specs",
-            "total_crops",
+            "crop_counts_by_size",
             "num_standardization_specs",
             "resolutions",
             "loader_modalities",
         ]
-        labels = ["Dataset", "Modalities", "Images", "Crop specs", "Crops", "Std specs", "Resolutions", "Loader modalities"]
+        labels = [
+            "Dataset",
+            "Modalities",
+            "Images",
+            "Crop files",
+            "Crop counts by size",
+            "Std specs",
+            "Resolutions",
+            "Loader modalities",
+        ]
         table.add_columns(*labels)
         for _, row in dataset_df[columns].iterrows():
             table.add_row(*[str(row[col]) for col in columns])
@@ -668,12 +721,14 @@ class DatasetInventoryApp(App):
         self._filtered_modality_df = pd.DataFrame()
         self._filtered_crop_df = pd.DataFrame()
         self._filtered_std_df = pd.DataFrame()
+        self._crop_sizes: list[str] = []
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Footer()
 
         self._dataset_df, self._modality_df, self._crop_df, self._std_df = load_inventory()
+        self._crop_sizes = sorted(self._crop_df["crop_size"].astype(str).unique().tolist(), key=lambda value: (len(value), value)) if not self._crop_df.empty else []
         datasets = self._dataset_df["dataset"].tolist() if not self._dataset_df.empty else []
 
         with Horizontal():
@@ -681,7 +736,7 @@ class DatasetInventoryApp(App):
             with Vertical(id="main-content"):
                 with TabbedContent(id="tabs"):
                     with TabPane("📊 Summary", id="summary"):
-                        yield SummaryView(id="summary-view")
+                        yield SummaryView(crop_sizes=self._crop_sizes, id="summary-view")
                     with TabPane("🔎 Explorer", id="explorer"):
                         yield ExplorerView(id="explorer-view")
 
