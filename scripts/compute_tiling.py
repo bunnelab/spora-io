@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -11,10 +12,11 @@ from tqdm import tqdm
 
 from spatialprot_data._config import get_datasets_dir
 from spatialprot_data.datasets.he import HEImagingDataset
+from spatialprot_data.datasets.ihc import SingleIHCImagingDataset
 from spatialprot_data.datasets.multiplex import MultiplexImagingDataset
 from spatialprot_data.utils.helpers.crop import best_mask_tiling_try_to_stop
 
-VALID_MODALITIES = ["he", "imc", "codex", "cycif"]
+VALID_MODALITIES = ["he", "imc", "codex", "cycif", "ihc"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,8 +28,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "modality",
         nargs="?",
-        choices=VALID_MODALITIES,
-        help="Optional single modality to process.",
+        help=(
+            "Optional modality to process. Use one of he/imc/codex/cycif, 'ihc' to process all "
+            "IHC markers, or a specific marker like 'ihc_CD3'."
+        ),
     )
     parser.add_argument(
         "--resolution",
@@ -38,6 +42,63 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def discover_modalities(dataset_root: Path, requested: str | None) -> list[str]:
+    if requested is not None:
+        if requested in {"he", "imc", "codex", "cycif"}:
+            return [requested]
+        if requested == "ihc":
+            ihc_root = dataset_root / "ihc"
+            return sorted(child.name for child in ihc_root.iterdir() if child.is_dir() and child.name.startswith("ihc_")) if ihc_root.exists() else []
+        if requested.startswith("ihc_"):
+            return [requested]
+        raise ValueError(
+            f"Unsupported modality '{requested}'. Use one of {VALID_MODALITIES} or a specific IHC marker like 'ihc_CD3'."
+        )
+
+    modalities = [modality for modality in ["he", "imc", "codex", "cycif"] if (dataset_root / modality).is_dir()]
+    ihc_root = dataset_root / "ihc"
+    if ihc_root.exists():
+        modalities.extend(sorted(child.name for child in ihc_root.iterdir() if child.is_dir() and child.name.startswith("ihc_")))
+    return modalities
+
+
+def segmentations_relpath(modality: str) -> Path:
+    if modality.startswith("ihc_"):
+        return Path("ihc") / modality
+    return Path(modality)
+
+
+def build_dataset(dataset_root: Path, dataset_name: str, modality: str, resolution: float):
+    if modality == "he":
+        return HEImagingDataset(
+            name=dataset_name,
+            path=dataset_root,
+            verbose=True,
+            resolution=resolution,
+            crop_size=0,
+        )
+    if modality in {"imc", "codex", "cycif"}:
+        return MultiplexImagingDataset(
+            name=dataset_name,
+            modality=modality,
+            path=dataset_root,
+            verbose=True,
+            resolution=resolution,
+            crop_size=0,
+            standardization="identity",
+        )
+    if modality.startswith("ihc_"):
+        return SingleIHCImagingDataset(
+            name=dataset_name,
+            path=dataset_root,
+            marker_name=modality,
+            verbose=True,
+            resolution=resolution,
+            crop_size=0,
+        )
+    raise ValueError(f"Unsupported modality '{modality}' for dataset '{dataset_name}'.")
+
+
 def main():
     args = parse_args()
     dataset_dir = get_datasets_dir()
@@ -46,10 +107,9 @@ def main():
     modality = args.modality
     resolution = args.resolution
     resolution_dir = f"{str(resolution).replace('.', '_')}mpp"
+    dataset_root = dataset_dir / dataset_name
 
-    valid_modalities = [
-        m for m in VALID_MODALITIES if (dataset_dir / dataset_name / m).is_dir()
-    ] if modality is None else [modality]
+    valid_modalities = discover_modalities(dataset_root, modality)
     if not valid_modalities:
         raise ValueError(
             f"No valid modalities found for dataset '{dataset_name}' in {dataset_dir}."
@@ -58,14 +118,16 @@ def main():
     print(f"Found valid modalities for dataset '{dataset_name}': {valid_modalities}")
 
     for modality in valid_modalities:
-        tissue_mask_path = (
-            dataset_dir
-            / dataset_name
-            / "segmentations"
-            / modality
-            / "tissue_masks"
-            / resolution_dir
-        )
+        seg_relpath = segmentations_relpath(modality)
+        tissue_mask_path = dataset_root / "segmentations" / seg_relpath / "tissue_masks" / resolution_dir
+        coords_path = dataset_root / "segmentations" / seg_relpath / "crop_coordinates" / resolution_dir / f"{crop_size}_tiles_coordinates.json"
+
+        if coords_path.exists():
+            print(
+                f"Crop coordinates already exist for modality '{modality}' in "
+                f"dataset '{dataset_name}' at {coords_path}. Skipping.",
+            )
+            continue
 
         if os.path.exists(tissue_mask_path) and len(os.listdir(tissue_mask_path)) > 0:
             print(f"Processing modality '{modality}' for dataset '{dataset_name}'...")
@@ -77,28 +139,7 @@ def main():
             )
             continue
 
-        if modality == "he":
-            dataset = HEImagingDataset(
-                name=dataset_name,
-                path=dataset_dir / dataset_name,
-                verbose=True,
-                resolution=resolution,
-                crop_size=0,
-            )
-        elif modality in ["imc", "codex", "cycif"]:
-            dataset = MultiplexImagingDataset(
-                name=dataset_name,
-                modality=modality,
-                path=dataset_dir / dataset_name,
-                verbose=True,
-                resolution=resolution,
-                crop_size=0,
-                standardization="identity",
-            )
-        else:
-            raise ValueError(
-                f"Unsupported modality '{modality}' for dataset '{dataset_name}'."
-            )
+        dataset = build_dataset(dataset_root, dataset_name, modality, resolution)
 
         tids = dataset.get_tissue_ids()
         tissue_mask_frac = {}
@@ -141,14 +182,7 @@ def main():
             f"{np.std(list(tissue_mask_num_tiles.values())):.2f}"
         )
 
-        df_path = (
-            dataset_dir
-            / dataset_name
-            / "metadata"
-            / "crop_tiling"
-            / f"{dataset.resolution}"
-            / "tiling_stats.parquet"
-        )
+        df_path = dataset_root / "metadata" / "crop_tiling" / f"{dataset.resolution}" / "tiling_stats.parquet"
         if df_path.exists():
             df = pd.read_parquet(df_path)
         else:
@@ -159,14 +193,7 @@ def main():
         df[f"{modality}_num_tiles_{crop_size}"] = pd.Series(tissue_mask_num_tiles)
         df.to_parquet(df_path)
 
-        coords_dir = (
-            dataset_dir
-            / dataset_name
-            / "segmentations"
-            / modality
-            / "crop_coordinates"
-            / f"{dataset.resolution}"
-        )
+        coords_dir = dataset_root / "segmentations" / seg_relpath / "crop_coordinates" / f"{dataset.resolution}"
         os.makedirs(coords_dir, exist_ok=True)
         with open(coords_dir / f"{crop_size}_tiles_coordinates.json", "w") as f:
             json.dump(tile_coordinates, f)
