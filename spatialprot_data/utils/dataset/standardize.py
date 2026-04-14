@@ -198,15 +198,11 @@ class StatsBackedStandardizer(BaseStandardizer):
     def _resolve_stats_dir(self) -> Path:
         direct = self.modality_dir / "standardization" / Path(self.spec)
         if direct.exists():
-            return direct
-
-        nested = self.modality_dir / "standardization" / self.method / Path(self.spec)
-        if nested.exists():
-            return nested
+            return direct   
 
         raise FileNotFoundError(
             f"Could not resolve standardization stats directory for '{self.spec}'. "
-            f"Tried {direct} and {nested}."
+            f"Tried {direct}."
         )
 
     def _load_table(self, path: Path) -> pd.DataFrame:
