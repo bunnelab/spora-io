@@ -30,13 +30,14 @@ class MultiplexImagingDataset(BaseImagingDataset):
                  modality: str,
                  standardization: str, 
                  resolution: float | str,
-                 crop_size: Optional[int] = None,
+                 tile_size: Optional[int] = None,
                  verbose: bool = True,
                  load_cell_metadata: bool = False,
                  disable_quantile_mask: bool = True,
                  filter_list: List[str] | None = None,
                  use_mean_std: bool = True,
                  return_uniprot_ids: bool = True,
+                 tile_strategy: Optional[str] = None,
                  **kwargs
     ):
         assert modality in self.VALID_MODALITIES, f"Invalid modality {modality}. Valid options are: {self.VALID_MODALITIES}"
@@ -44,13 +45,15 @@ class MultiplexImagingDataset(BaseImagingDataset):
         super().__init__(name=name, path=path, 
                          modality=modality,
                          resolution=resolution, 
-                         crop_size=crop_size,
+                         tile_size=tile_size,
                          load_cell_metadata=load_cell_metadata, 
-                         verbose=verbose, 
+                         verbose=verbose,
+                         tile_strategy=tile_strategy,
+                         **kwargs, 
                          **label_kwargs)
         self.return_uniprot_ids = return_uniprot_ids
         self.kwargs = kwargs
-        self.img_folder = self.path / self.modality.canonical_dir / self.resolution #type: ignore
+        self.img_folder = self.path / self.modality.canonical_dir / self.resolution / "images"
 
         self.channel_list = pd.read_parquet(self.path / self.modality.canonical_dir / "channels.parquet")
 
@@ -99,7 +102,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             print_verbose(f"Using Multiplex standardization: {self.standardizer.__class__.__name__}")
         # generating marker indices
         self._try_to_create_uniprot_mask()
-        self._try_to_load_crop_coords()
+        self._try_to_load_tile_coords()
 
     def _try_to_create_uniprot_mask(self):
         if "uniprot_id" not in self.channel_list.columns:
@@ -301,68 +304,86 @@ class MultiplexImagingDataset(BaseImagingDataset):
             return img.shape[2], img.shape[0], img.shape[1] #type: ignore
 
 
-
-    def get_crop(self, tissue_id: str, crop_id: int, preprocess=True, kind="uniprot_filtered") -> MultiplexTissue:
+    def get_tile_by_coordinates(self, tissue_id: str, row: int, col: int,
+                 preprocess: bool = True,
+                 kind: str = "uniprot_filtered") -> MultiplexTissue:
         """
-        Get a specific crop based on the tissue id and crop id
+        Get a specific tile based on the tissue id and tile row and column coordinates.
         Args:
-            tissue_id (str): The tissue ID to retrieve the crop for.
-            crop_id (int): The crop ID to retrieve.
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            row (int): The row coordinate of the top-left corner of the tile.
+            col (int): The column coordinate of the top-left corner of the tile.
+            preprocess (bool): Whether to preprocess the tile using the standardizer. Default is True.
+            kind (str): The kind of tissue image to retrieve for the tile. Valid options are "complete", "qc_filtered", and "uniprot_filtered". Default is "uniprot_filtered".
         Returns:
-            MultiplexTissue: The specific crop as an MultiplexTissue instance.
+            MultiplexTissue: The specific tile as a MultiplexTissue instance.
         """
-        if self.crop_coordinates is None: # fallback
-            C, H, W = self._get_tissue_size(tissue_id)
-            col = np.random.randint(0, W - self.crop_size)
-            row = np.random.randint(0, H - self.crop_size)
-        else:
-            row, col = self.crop_coordinates[tissue_id][crop_id]
 
         if kind == "complete":
-            crop = self._get_crop_all_channels(tissue_id, col, row)
+            tile = self._get_tile_all_channels(tissue_id, col, row)
         elif kind == "qc_filtered":
-            crop = self._get_crop_qc_filtered(tissue_id, col, row)
+            tile = self._get_tile_qc_filtered(tissue_id, col, row)
         elif kind == "uniprot_filtered":
-            crop = self._get_crop_uniprot_filtered(tissue_id, col, row)
+            tile = self._get_tile_uniprot_filtered(tissue_id, col, row)
         else:
             raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
 
         if preprocess:
-            img, refined_mask = self.standardizer.apply(crop.tissue, tissue_id, crop.measured_mask, crop.image_loading_mask)
+            img, refined_mask = self.standardizer.apply(tile.tissue, tissue_id, tile.measured_mask, tile.image_loading_mask)
             image_loading_mask, channel_names, uniprot_ids = self._refine_channel_metadata(
-                crop.image_loading_mask,
-                crop.channel_names,
-                crop.uniprot_ids,
+                tile.image_loading_mask,
+                tile.channel_names,
+                tile.uniprot_ids,
                 refined_mask,
             )
             return MultiplexTissue(
                 tissue=img,
                 tissue_id=tissue_id,
-                measured_mask=crop.measured_mask,
+                measured_mask=tile.measured_mask,
                 image_loading_mask=image_loading_mask,
                 channel_names=channel_names,
                 uniprot_ids=uniprot_ids,
-                kind="crop",
-                crop_id=crop_id
+                kind="tile",
             )
-        return crop
+        return tile
+
+
+
+    def get_tile_by_id(self, tissue_id: str, tile_id: int, preprocess=True, kind="uniprot_filtered") -> MultiplexTissue:
+        """
+        Get a specific tile based on the tissue id and tile id
+        Args:
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            tile_id (int): The tile ID to retrieve.
+        Returns:
+            MultiplexTissue: The specific tile as an MultiplexTissue instance.
+        """
+        if self.tile_coordinates is None: # fallback
+            C, H, W = self._get_tissue_size(tissue_id)
+            col = np.random.randint(0, W - self.tile_size)
+            row = np.random.randint(0, H - self.tile_size)
+        else:
+            row, col = self.tile_coordinates[tissue_id][tile_id]
+
+        return self.get_tile_by_coordinates(tissue_id, row, col, preprocess=preprocess, kind=kind)
+        
         
     
-    def _get_crop_all_channels(self, tissue_id: str, crop_x: int, crop_y: int) -> MultiplexTissue:
+    def _get_tile_all_channels(self, tissue_id: str, tile_x: int, tile_y: int) -> MultiplexTissue:
         """
-        Get the full tissue crop without filtering channels for a given tissue id and crop coordinates.
+        Get the full tissue tile without filtering channels for a given tissue id and tile coordinates.
         Args:
-            tissue_id (str): The tissue ID to retrieve the crop for.
-            crop_x (int): The x coordinate of the top-left corner of the crop.
-            crop_y (int): The y coordinate of the top-left corner of the crop.
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            tile_x (int): The x coordinate of the top-left corner of the tile.
+            tile_y (int): The y coordinate of the top-left corner of the tile.
         Returns:
-            MultiplexTissue: Data class containing the full tissue crop as a torch.Tensor of shape (C, crop_size, crop_size) and the tissue ID.
+            MultiplexTissue: Data class containing the full tissue tile as a torch.Tensor of shape (C, tile_size, tile_size) and the tissue ID.
         """
         img_path = self.img_folder / f"{tissue_id}.zarr"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
-        crop = torch.from_numpy(zarr.open(img_path, mode='r')[:, crop_y:crop_y+self.crop_size, crop_x:crop_x+self.crop_size]).float()
+        tile = torch.from_numpy(zarr.open(img_path, mode='r')[:, tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
         return MultiplexTissue(
-            tissue=crop,
+            tissue=tile,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=np.ones(measured_mask.sum(), dtype=bool),
@@ -370,23 +391,23 @@ class MultiplexImagingDataset(BaseImagingDataset):
             uniprot_ids=self.get_uniprot_ids(tissue_id, kind="complete", measured_mask=measured_mask),
         )
     
-    def _get_crop_qc_filtered(self, tissue_id: str, crop_x: int, crop_y: int) -> MultiplexTissue:
+    def _get_tile_qc_filtered(self, tissue_id: str, tile_x: int, tile_y: int) -> MultiplexTissue:
         """
-        Get the tissue crop filtered by quality control for a given tissue id and crop coordinates.
+        Get the tissue tile filtered by quality control for a given tissue id and tile coordinates.
         Args:
-            tissue_id (str): The tissue ID to retrieve the crop for. 
-            crop_x (int): The x coordinate of the top-left corner of the crop.
-            crop_y (int): The y coordinate of the top-left corner of the crop.
+            tissue_id (str): The tissue ID to retrieve the tile for. 
+            tile_x (int): The x coordinate of the top-left corner of the tile.
+            tile_y (int): The y coordinate of the top-left corner of the tile.
         Returns:
-            MultiplexTissue: Data class containing the quality control filtered tissue crop as a torch.Tensor of shape (C, crop_size, crop_size) and the tissue ID.
+            MultiplexTissue: Data class containing the quality control filtered tissue tile as a torch.Tensor of shape (C, tile_size, tile_size) and the tissue ID.
         """ 
         img_path = self.img_folder / f"{tissue_id}.zarr"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         image_loading_mask = self.quality_control_mask[measured_mask]
-        crop = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), crop_y:crop_y+self.crop_size, crop_x:crop_x+self.crop_size]).float()
+        tile = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
         qc_mask = self.quality_control_mask & measured_mask
         return MultiplexTissue(
-            tissue=crop,
+            tissue=tile,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask,
@@ -394,24 +415,24 @@ class MultiplexImagingDataset(BaseImagingDataset):
             uniprot_ids=self.get_uniprot_ids(tissue_id, kind="qc_filtered", measured_mask=measured_mask, qc_mask=qc_mask),
         )
     
-    def _get_crop_uniprot_filtered(self, tissue_id: str, crop_x: int, crop_y: int) -> MultiplexTissue:
+    def _get_tile_uniprot_filtered(self, tissue_id: str, tile_x: int, tile_y: int) -> MultiplexTissue:
         """
-        Get the tissue crop filtered by quality control and valid UniProt availability for a given tissue id and crop coordinates.
+        Get the tissue tile filtered by quality control and valid UniProt availability for a given tissue id and tile coordinates.
         Args:
-            tissue_id (str): The tissue ID to retrieve the crop for.
-            crop_x (int): The x coordinate of the top-left corner of the crop.
-            crop_y (int): The y coordinate of the top-left corner of the crop.
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            tile_x (int): The x coordinate of the top-left corner of the tile.
+            tile_y (int): The y coordinate of the top-left corner of the tile.
         Returns:
-            MultiplexTissue: Data class containing the filtered tissue crop as a torch.Tensor of shape (C, crop_size, crop_size) and the tissue ID.
+            MultiplexTissue: Data class containing the filtered tissue tile as a torch.Tensor of shape (C, tile_size, tile_size) and the tissue ID.
         """ 
         img_path = self.img_folder / f"{tissue_id}.zarr"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         qc_mask = self.quality_control_mask & measured_mask
         filtered_mask = self.uniprot_mask & qc_mask
         image_loading_mask = filtered_mask[measured_mask]
-        crop = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), crop_y:crop_y+self.crop_size, crop_x:crop_x+self.crop_size]).float()
+        tile = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
         return MultiplexTissue(
-            tissue=crop,
+            tissue=tile,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask, 

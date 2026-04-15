@@ -57,7 +57,6 @@ class HETissue:
     tissue_id: str
     channels: str = "RGB"
     kind: str = "tissue"
-    crop_id: int | None = None
 
 @dataclass(kw_only=True)
 class MultiplexTissue:
@@ -65,7 +64,6 @@ class MultiplexTissue:
     tissue: torch.Tensor | NDArray[np.float32]
     tissue_id: str
     kind: str = "tissue"
-    crop_id: int | None = None
     measured_mask: NDArray[np.bool_] | None
     image_loading_mask: NDArray[np.bool_] | None
     channel_names: NDArray[np.str_] | None = None
@@ -78,7 +76,6 @@ class IHCTissue:
     tissue_id: str
     channels: str = "RGB"
     kind: str = "tissue"
-    crop_id: int | None = None
 
 Tissue = HETissue | MultiplexTissue | IHCTissue
 

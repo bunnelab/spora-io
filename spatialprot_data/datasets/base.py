@@ -27,21 +27,29 @@ class BaseImagingDataset(ABC):
                  path: os.PathLike | str,
                  modality: ModKey,
                  resolution: float | str,
-                 crop_size: Optional[int] = None,
+                 tile_size: Optional[int] = None,
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
                  label: Optional[str] = None,
                  labels_to_keep: Optional[Sequence[str]] = None, 
                  label_modifying_fn: Optional[Callable] = None,
                  label_type: str = "classification",
+                 tile_strategy: Optional[str] = None,
                  ):
         self.name = name
         self.path = Path(path)
         self.verbose = verbose
         self.resolution = resolution
-        self.crop_size = crop_size
-        if self.crop_size is None:
-            print_verbose(f"No crop size is provided, cropping functionality will break. Please provide a crop size if you intend to use cropping functionality.", level="WARNING")
+        self.tile_size = tile_size
+        self.tile_strategy = tile_strategy
+        if self.tile_strategy is not None and self.tile_size is None:
+            raise ValueError(f"Tile strategy {self.tile_strategy} provided without tile size. Please provide a tile size to use tiling functionality.")
+        if self.tile_size is None:
+            print_verbose(f"No tile size is provided, tiling functionality will break. Please provide a tile size if you intend to use tiling functionality.", level="WARNING")
+
+        if self.tile_strategy is None:
+            self.tile_strategy = "default"
+            print_verbose(f"No tile strategy provided, using default.", level="WARNING")
         self.label = label 
         self.labels_to_keep = labels_to_keep
         self.label_modifying_fn = label_modifying_fn
@@ -62,7 +70,7 @@ class BaseImagingDataset(ABC):
             assert is_valid_modality_instance(modality), f"Invalid modality instance {type(modality)} provided."
 
         # check existence of tissue masks
-        self.tissue_masks_dir: Any | Path = self.path / "segmentations" / self.modality.canonical_dir / "tissue_masks" / self.resolution
+        self.tissue_masks_dir: Any | Path = self.path / "segmentations" / self.resolution / "tissue_masks"
 
         if not self.tissue_masks_dir.exists():
             print_verbose(f"Tissue masks directory {self.tissue_masks_dir} does not exist. Tissue masks will not be loaded.", level="WARNING")
@@ -123,7 +131,7 @@ class BaseImagingDataset(ABC):
         """
         pass
 
-    def get_tissue_mask(self, tissue_id: str, image_mode: str = "HWC") -> TissueMask:
+    def get_tissue_mask(self, tissue_id: str) -> TissueMask:
         """
         Get the tissue mask for a given tissue id. If the tissue masks directory does not exist, return a full mask.
         Args:
@@ -139,7 +147,7 @@ class BaseImagingDataset(ABC):
         if not mask_path.exists():
             print_verbose(f"Tissue mask file {mask_path} does not exist. Returning full mask.",
                             level="WARNING")
-            tissue_size = self._get_tissue_size(tissue_id, image_mode="CHW")
+            tissue_size = self._get_tissue_size(tissue_id)
             return TissueMask(mask=np.ones((tissue_size[1], tissue_size[2]), dtype=np.bool_),
                               tissue_id=tissue_id)
         return TissueMask(
@@ -147,12 +155,11 @@ class BaseImagingDataset(ABC):
             tissue_id=tissue_id
         )
     @abstractmethod
-    def _get_tissue_size(self, tissue_id: str, image_mode: str = "CHW") -> Tuple[int, int, int]:
+    def _get_tissue_size(self, tissue_id: str) -> Tuple[int, int, int]:
         """
         Get the tissue size (C,H,W) for a given tissue id.
         Args:
             tissue_id (str): The tissue ID to retrieve the size for.
-            image_mode (str): The image mode of the tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
         Returns:
             Tuple[int, int, int]: The tissue size as a tuple (C, H, W).
         """
@@ -160,14 +167,14 @@ class BaseImagingDataset(ABC):
 
 
     @abstractmethod
-    def get_crop(self, tissue_id: str, crop_id: int) -> Tissue:
+    def get_tile(self, tissue_id: str, tile_id: int) -> Tissue:
         """
-        Get a specific crop based on the tissue id and crop id. 
+        Get a specific tile based on the tissue id and tile id. 
         Args:
-            tissue_id (str): The tissue ID to retrieve the crop for.
-            crop_id (int): The crop ID to retrieve.
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            tile_id (int): The tile ID to retrieve.
         Returns:
-            Tissue: The crop image as a Tissue instance.
+            Tissue: The tile image as a Tissue instance.
         """
 
     def get_cell_instance_mask(self, tissue_id: str, match_tissue_resolution: bool = False) -> CellMask:
@@ -182,7 +189,7 @@ class BaseImagingDataset(ABC):
             CellMask: The cell instance mask as a CellMask instance.
 
         """
-        ci_mask_path = self.path / "segmentations" / self.modality.canonical_dir / "cell_masks" / "instances" / f"{tissue_id}.npz"
+        ci_mask_path = self.path / "segmentations" / self.resolution / "cell_masks" / "instances" / f"{tissue_id}.npz"
         if not ci_mask_path.exists():
             raise ValueError(f"Cell instance mask file {ci_mask_path} does not exist for tissue_id {tissue_id}.")
         mask = np.load(ci_mask_path)["mask"]
@@ -205,14 +212,14 @@ class BaseImagingDataset(ABC):
         Returns:
             CellMask: The cell task mask as a CellMask instance.
         """
-        ct_mask_path = self.path / "segmentations" / self.modality.canonical_dir / "cell_masks" / mask_type / f"{tissue_id}.npz"
+        ct_mask_path = self.path / "segmentations" / self.resolution / "cell_masks" / mask_type / f"{tissue_id}.npz"
         if not ct_mask_path.exists():
             raise ValueError(f"Cell task mask file {ct_mask_path} does not exist for tissue_id {tissue_id} and mask_type {mask_type}.")
         if hasattr(self, f"{mask_type}_label_encoder"):
             label_encoder = getattr(self, f"{mask_type}_label_encoder")
             mapping = getattr(self, f"{mask_type}_mapping")
         else:
-            label_encoder = pd.read_parquet(self.path / "segmentations" / self.modality.canonical_dir / "cell_masks" / mask_type / "label_encoder.parquet")
+            label_encoder = pd.read_parquet(self.path / "segmentations" / self.resolution / "cell_masks" / mask_type / "label_encoder.parquet")
             mapping = {row["id"]: row["name"] for _, row in label_encoder.iterrows()}
             setattr(self, f"{mask_type}_label_encoder", label_encoder)
             setattr(self, f"{mask_type}_mapping", mapping)
@@ -230,7 +237,7 @@ class BaseImagingDataset(ABC):
         Returns:
             Sequence[str]: A list of available cell task mask types.
         """
-        categories_dir = self.path / "segmentations" / self.modality.canonical_dir / "cell_masks" 
+        categories_dir = self.path / "segmentations" / self.resolution / "cell_masks" 
         if not categories_dir.exists():
             raise ValueError(f"Categories directory {categories_dir} does not exist.")
         return [d.name for d in categories_dir.iterdir() if d.is_dir() and d.name != "instances"]
@@ -254,38 +261,38 @@ class BaseImagingDataset(ABC):
         return [self.get_tissue(tissue_id, kind=kind, preprocess=preprocess, image_mode=image_mode) for tissue_id in tissue_ids]
 
 
-    def _try_to_load_crop_coords(self):
-        # crop coordinates
-        if self.crop_size is None:
-            self.crop_coordinates = None
+    def _try_to_load_tile_coords(self):
+        # tile coordinates
+        if self.tile_size is None:
+            self.tile_coordinates = None
             if self.verbose:
-                print_verbose(f"No crop size provided, skipping loading of crop coordinates.", level="WARNING")
+                print_verbose(f"No tile size provided, skipping loading of tile coordinates.", level="WARNING")
             return
-        crop_coords_path = self.path / "segmentations" / self.modality.canonical_dir / "crop_coordinates" / self.resolution / f"{self.crop_size}_tiles_coordinates.json"
-        if crop_coords_path.exists():
-            self.crop_coordinates = json.load(crop_coords_path.open())
+        tile_coords_path = self.path / "tiling" / self.resolution / self.tile_strategy / f"{self.tile_size}_tiles_coordinates.json"
+        if tile_coords_path.exists():
+            self.tile_coordinates = json.load(tile_coords_path.open())
             if self.verbose:
-                print_verbose(f"Loaded crop coordinates from {crop_coords_path}")
+                print_verbose(f"Loaded tile coordinates from {tile_coords_path}")
         else:
-            self.crop_coordinates = None
+            self.tile_coordinates = None
             if self.verbose:
-                print_verbose(f"No crop coordinates found at {crop_coords_path}. get_crop will return random crops.", level="WARNING")
+                print_verbose(f"No tile coordinates found at {tile_coords_path}. get_tile will return random tiles.", level="WARNING")
 
-        crop_count = self._count_crops()
+        tile_count = self._count_tiles()
         if self.verbose:
-            print_verbose(f"Dataset {self.name} has {crop_count} crops of size {self.crop_size} at resolution {self.resolution}.",
-                          level="DEBUG" if crop_count > 0 else "WARNING")
+            print_verbose(f"Dataset {self.name} has {tile_count} tiles of size {self.tile_size} at resolution {self.resolution}.",
+                          level="DEBUG" if tile_count > 0 else "WARNING")
 
-    def _count_crops(self) -> int:
+    def _count_tiles(self) -> int:
         """
-        Count the number of crops in the dataset.
+        Count the number of tiles in the dataset.
         Args:
-            crop_folder_path (str | None): The path to the crop folder. If None, uses the default crop folder.
+            tile_folder_path (str | None): The path to the tile folder. If None, uses the default tile folder.
         Returns:
-            int: The number of crops in the dataset.
+            int: The number of tiles in the dataset.
         """
-        if self.crop_coordinates is not None:
-            return sum(len(coords) for coords in self.crop_coordinates.values())
+        if self.tile_coordinates is not None:
+            return sum(len(coords) for coords in self.tile_coordinates.values())
         else:
             return 0
 

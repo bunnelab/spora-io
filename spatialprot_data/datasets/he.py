@@ -37,7 +37,8 @@ class HEImagingDataset(BaseImagingDataset):
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
                  mean_std_type: str = "imagenet",
-                 crop_size: Optional[int] = None,
+                 tile_size: Optional[int] = None,
+                 tile_strategy: Optional[str] = None,
                  **kwargs
     ):
         super().__init__(
@@ -45,14 +46,15 @@ class HEImagingDataset(BaseImagingDataset):
             path=path,
             modality="he",
             resolution=resolution,
-            crop_size=crop_size,
+            tile_size=tile_size,
             load_cell_metadata=load_cell_metadata,
             verbose=verbose,
+            tile_strategy=tile_strategy,
             **kwargs,
         )
         self.mean_std_type = mean_std_type
 
-        self.img_folder = self.path / self.modality.canonical_dir / self.resolution #type: ignore
+        self.img_folder = self.path / self.modality.canonical_dir / self.resolution / "images"
         assert self.img_folder.exists(), f"Image folder {self.img_folder} does not exist."
 
         if self.mean_std_type == "imagenet":
@@ -64,7 +66,7 @@ class HEImagingDataset(BaseImagingDataset):
         else:
             raise ValueError(f"Invalid mean_std_type {self.mean_std_type}. Valid options are 'imagenet' and 'hibou'.")
 
-        self._try_to_load_crop_coords()
+        self._try_to_load_tile_coords()
 
     def _get_tissue_all_channels(self, tissue_id: str, preprocess: bool=False, image_mode: str = "CHW") -> HETissue:
         """
@@ -77,8 +79,8 @@ class HEImagingDataset(BaseImagingDataset):
         """
         img_path = self.img_folder / f"{tissue_id}.zarr"
         img = torch.from_numpy(zarr.open(img_path, mode='r')[:]).float()
-        if image_mode == "CHW":
-            img = rearrange(img, "H W C -> C H W")
+        if image_mode == "HWC":
+            img = rearrange(img, "C H W -> H W C")
         if preprocess:
             img = self._preprocess(img)
         return HETissue(
@@ -95,13 +97,13 @@ class HEImagingDataset(BaseImagingDataset):
             torch.Tensor: The preprocessed image.
         """
         if isinstance(img, np.ndarray):
-            img = torch.from_numpy(img / 255.0).float() # type: ignore
+            img = torch.from_numpy(img / 255.0).float() 
         else:
             img = img / 255.0
         img = (img - self.mean) / self.std
-        return img # type: ignore
+        return img 
 
-    def get_tissue(self, tissue_id: str, kind: str = "complete", preprocess: bool = True, image_mode: str = "CHW") -> HETissue:
+    def get_tissue(self, tissue_id: str, kind: str = "complete", preprocess: bool = True, image_mode="CHW") -> HETissue:
         """
         Get the normalized tissue image post filtering channels for a given tissue id.
         Args:
@@ -114,7 +116,7 @@ class HEImagingDataset(BaseImagingDataset):
         """
         return self._get_tissue_all_channels(tissue_id, preprocess=preprocess, image_mode=image_mode)
     
-    def _get_tissue_size(self, tissue_id: str, image_mode: str = "CHW") -> Tuple[int, int, int]:
+    def _get_tissue_size(self, tissue_id: str) -> Tuple[int, int, int]:
         """
         Get the tissue size (C,H,W) for a given tissue id.
         Args:
@@ -125,42 +127,56 @@ class HEImagingDataset(BaseImagingDataset):
         """
         img_path = self.img_folder / f"{tissue_id}.zarr"
         img = zarr.open(img_path, mode='r')
-        if image_mode == "CHW":
-            return img.shape[2], img.shape[0], img.shape[1] #type: ignore
-        else:
-            return img.shape[0], img.shape[1], img.shape[2] #type: ignore
+        return img.shape[0], img.shape[1], img.shape[2] #type: ignore
 
-    def get_crop(self, tissue_id: str, crop_id: int,
+    def get_tile_by_coordinates(self, tissue_id: str, row: int, col: int,
                  image_mode: str = "CHW",
                  preprocess: bool = True) -> HETissue:
         """
-        Get a specific crop based on the tissue id and crop id
-        Args:
-            tissue_id (str): The tissue ID to retrieve the crop for.
-            crop_id (int): The crop ID to retrieve.
+        Get a specific tile based on the tissue id and tile id
+        Args:            
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            row (int): The row coordinate of the tile.
+            col (int): The column coordinate of the tile.
+            image_mode (str): The image mode of the tile image. Valid options are "CHW" and "HWC". Default is "CHW".
+            preprocess (bool): If True, preprocess the image (normalize). Default is True.
         Returns:
-            HETissue: The specific crop as an HETissue instance.
-        """
-        if self.crop_coordinates is None: # fallback
-            C, H, W = self._get_tissue_size(tissue_id)
-            row = np.random.randint(0, H - self.crop_size)
-            col = np.random.randint(0, W - self.crop_size)
-        else:
-            row, col = self.crop_coordinates[tissue_id][crop_id]
-        crop = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[row:row+self.crop_size, col:col+self.crop_size, :] # type: ignore
+            HETissue: The specific tile as an HETissue instance.
+        """ 
+        tile = torch.from_numpy(
+            zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[row:row+self.tile_size, col:col+self.tile_size, :] # type: ignore
         ).float()
-        if image_mode == "CHW":
-            crop = rearrange(crop, "H W C -> C H W")
+        if image_mode == "HWC":
+            tile = rearrange(tile, "C H W -> H W C")
         if preprocess:
-            crop = self._preprocess(crop)
+            tile = self._preprocess(tile)
         return HETissue(
-            tissue=crop,
+            tissue=tile,
             tissue_id=tissue_id,
-            crop_id=crop_id,
             channels="RGB",
-            kind="crop"
+            kind="tile"
         )
+
+
+    def get_tile(self, tissue_id: str, tile_id: int,
+                 image_mode: str = "CHW",
+                 preprocess: bool = True) -> HETissue:
+        """
+        Get a specific tile based on the tissue id and tile id
+        Args:
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            tile_id (int): The tile ID to retrieve.
+        Returns:
+            HETissue: The specific tile as an HETissue instance.
+        """
+        if self.tile_coordinates is None: # fallback
+            C, H, W = self._get_tissue_size(tissue_id)
+            row = np.random.randint(0, H - self.tile_size)
+            col = np.random.randint(0, W - self.tile_size)
+        else:
+            row, col = self.tile_coordinates[tissue_id][tile_id]
+        
+        return self.get_tile_by_coordinates(tissue_id, row, col, preprocess=preprocess, image_mode=image_mode)
     
 
 

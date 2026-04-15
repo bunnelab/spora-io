@@ -35,10 +35,12 @@ class SingleIHCImagingDataset(BaseImagingDataset):
                  path: os.PathLike | str,
                  marker_name: str,
                  resolution: float | str,
-                 crop_size: int, 
+                 tile_size: int, 
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
-                 mean_std_type: str = "imagenet"
+                 mean_std_type: str = "imagenet",
+                 tile_strategy: Optional[str] = None,
+                 **kwargs
     ):
         self.marker_name = marker_name
         if not self.marker_name.startswith("ihc_"):
@@ -48,9 +50,10 @@ class SingleIHCImagingDataset(BaseImagingDataset):
             path=path,
             modality=IHCModality(name=self.marker_name, canonical_dir=f"ihc/{self.marker_name}"), 
             resolution=resolution,
-            crop_size=crop_size,
+            tile_size=tile_size,
             load_cell_metadata=load_cell_metadata,
             verbose=verbose,
+            tile_strategy=tile_strategy,
         )
         self.mean_std_type = mean_std_type
 
@@ -66,7 +69,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         else:
             raise ValueError(f"Invalid mean_std_type {self.mean_std_type}. Valid options are 'imagenet' and 'hibou'.")
 
-        self._try_to_load_crop_coords()
+        self._try_to_load_tile_coords()
 
     def _get_tissue_all_channels(self, tissue_id: str, preprocess: bool=False, image_mode: str = "CHW") -> IHCTissue:
         """
@@ -79,8 +82,8 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         """
         img_path = self.img_folder / f"{tissue_id}.zarr"
         img = torch.from_numpy(zarr.open(img_path, mode='r')[:]).float()
-        if image_mode == "CHW":
-            img = rearrange(img, "H W C -> C H W")
+        if image_mode == "HWC":
+            img = rearrange(img, "C H W -> H W C")
         if preprocess:
             img = self._preprocess(img)
         return IHCTissue(
@@ -128,41 +131,37 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         """
         img_path = self.img_folder / f"{tissue_id}.zarr"
         img = zarr.open(img_path, mode='r')
-        if image_mode == "CHW":
-            return img.shape[2], img.shape[0], img.shape[1] #type: ignore
-        else:
-            return img.shape[0], img.shape[1], img.shape[2] #type: ignore
+        return img.shape[0], img.shape[1], img.shape[2] #type: ignore
 
-    def get_crop(self, tissue_id: str, crop_id: int,
+    def get_tile(self, tissue_id: str, tile_id: int,
                  image_mode: str = "CHW",
                  preprocess: bool = True) -> IHCTissue:
         """
-        Get a specific crop based on the tissue id and crop id
+        Get a specific tile based on the tissue id and tile id
         Args:
-            tissue_id (str): The tissue ID to retrieve the crop for.
-            crop_id (int): The crop ID to retrieve.
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            tile_id (int): The tile ID to retrieve.
         Returns:
-            IHCTissue: The specific crop as an IHCTissue instance.
+            IHCTissue: The specific tile as an IHCTissue instance.
         """
-        if self.crop_coordinates is None: # fallback
+        if self.tile_coordinates is None: # fallback
             C, H, W = self._get_tissue_size(tissue_id)
-            col = np.random.randint(0, W - self.crop_size)
-            row = np.random.randint(0, H - self.crop_size)
+            col = np.random.randint(0, W - self.tile_size)
+            row = np.random.randint(0, H - self.tile_size)
         else:
-            row, col = self.crop_coordinates[tissue_id][crop_id]
-        crop = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[row:row+self.crop_size, col:col+self.crop_size, :] # type: ignore
+            row, col = self.tile_coordinates[tissue_id][tile_id]
+        tile = torch.from_numpy(
+            zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[row:row+self.tile_size, col:col+self.tile_size, :] # type: ignore
         ).float()
-        if image_mode == "CHW":
-            crop = rearrange(crop, "H W C -> C H W")
+        if image_mode == "HWC":
+            tile = rearrange(tile, "C H W -> H W C")
         if preprocess:
-            crop = self._preprocess(crop)
+            tile = self._preprocess(tile)
         return IHCTissue(
-            tissue=crop,
+            tissue=tile,
             tissue_id=tissue_id,
-            crop_id=crop_id,
             channels="RGB",
-            kind="crop"
+            kind="tile"
         )
     
 
