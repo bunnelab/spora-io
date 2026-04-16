@@ -8,7 +8,6 @@ from loguru import logger
 import pandas as pd
 from numpy.typing import NDArray
 from typing import Any, Union, Tuple, Sequence, Callable, Optional
-import json
 
 from spatialprot_data.datasets._types import get_modality_from_str, is_valid_modality_instance, ModKey, Tissue, \
                                             TissueMask, CellMask
@@ -262,21 +261,35 @@ class BaseImagingDataset(ABC):
 
 
     def _try_to_load_tile_coords(self):
-        # tile coordinates
         if self.tile_size is None:
             self.tile_coordinates = None
             if self.verbose:
                 print_verbose(f"No tile size provided, skipping loading of tile coordinates.", level="WARNING")
             return
-        tile_coords_path = self.path / "tiling" / self.resolution / self.tile_strategy / f"{self.tile_size}_tiles_coordinates.json"
+
+        tile_coords_path = self.path / "tiling" / self.resolution / self.tile_strategy / f"{self.tile_size}_tile_coordinates.parquet"
         if tile_coords_path.exists():
-            self.tile_coordinates = json.load(tile_coords_path.open())
+            coords_df = pd.read_parquet(tile_coords_path)
+            required_columns = {"tissue_id", "crop_id", "row", "col"}
+            if not required_columns.issubset(coords_df.columns):
+                raise ValueError(
+                    f"Tile coordinate parquet {tile_coords_path} is missing required columns "
+                    f"{sorted(required_columns)}."
+                )
+            coords_df = coords_df.sort_values(["tissue_id", "crop_id"], kind="stable")
+            self.tile_coordinates = {
+                tissue_id: list(zip(group["row"].astype(int), group["col"].astype(int), strict=False))
+                for tissue_id, group in coords_df.groupby("tissue_id", sort=False)
+            }
             if self.verbose:
                 print_verbose(f"Loaded tile coordinates from {tile_coords_path}")
         else:
             self.tile_coordinates = None
             if self.verbose:
-                print_verbose(f"No tile coordinates found at {tile_coords_path}. get_tile will return random tiles.", level="WARNING")
+                print_verbose(
+                    f"No tile coordinates found at {tile_coords_path}. get_tile will return random tiles.",
+                    level="WARNING",
+                )
 
         tile_count = self._count_tiles()
         if self.verbose:
@@ -295,9 +308,6 @@ class BaseImagingDataset(ABC):
             return sum(len(coords) for coords in self.tile_coordinates.values())
         else:
             return 0
-
-
-
 
 
 
