@@ -145,7 +145,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Returns:
             MultiplexTissue: Data class containing the full tissue image as a torch.Tensor of shape (C, H, W) and the tissue ID.
         """
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         img = torch.from_numpy(zarr.open(img_path, mode='r')[:]).float()
         return MultiplexTissue(
@@ -165,7 +165,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Returns:
             MultiplexTissue: Data class containing the quality control filtered tissue image as a torch.Tensor of shape (C, H, W) and the tissue ID.
         """
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         image_loading_mask = self.quality_control_mask[measured_mask]
         img = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask)]).float()
@@ -187,7 +187,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Returns:
             MultiplexTissue: Data class containing the filtered tissue image as a torch.Tensor of shape (C, H, W) and the tissue ID.
         """
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         qc_mask = self.quality_control_mask & measured_mask
         filtered_mask = self.uniprot_mask & qc_mask
@@ -296,7 +296,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         return tissue
 
     def _get_tissue_size(self, tissue_id: str, image_mode: str = "CHW") -> Tuple[int, int, int]:
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         img = zarr.open(img_path, mode='r')
         if image_mode == "CHW":
             return img.shape[0], img.shape[1], img.shape[2] #type: ignore
@@ -379,7 +379,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Returns:
             MultiplexTissue: Data class containing the full tissue tile as a torch.Tensor of shape (C, tile_size, tile_size) and the tissue ID.
         """
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         tile = torch.from_numpy(zarr.open(img_path, mode='r')[:, tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
         return MultiplexTissue(
@@ -401,7 +401,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Returns:
             MultiplexTissue: Data class containing the quality control filtered tissue tile as a torch.Tensor of shape (C, tile_size, tile_size) and the tissue ID.
         """ 
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         image_loading_mask = self.quality_control_mask[measured_mask]
         tile = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
@@ -425,7 +425,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Returns:
             MultiplexTissue: Data class containing the filtered tissue tile as a torch.Tensor of shape (C, tile_size, tile_size) and the tissue ID.
         """ 
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         qc_mask = self.quality_control_mask & measured_mask
         filtered_mask = self.uniprot_mask & qc_mask
