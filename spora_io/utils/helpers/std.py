@@ -100,7 +100,6 @@ def calculate_image_level_quantiles(
 
                     # Apply tissue mask 
                     channel_img = channel_img[tissue_mask]
-                    logger.debug(f"channel_img shape: {channel_img.shape}")
                     
                     # Calculate quantile
                     q_upper = np.quantile(channel_img, upper_quantile)

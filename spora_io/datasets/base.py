@@ -270,13 +270,13 @@ class BaseImagingDataset(ABC):
         tile_coords_path = self.path / "tiling" / self.resolution / self.tile_strategy / f"{self.tile_size}_tile_coordinates.parquet"
         if tile_coords_path.exists():
             coords_df = pd.read_parquet(tile_coords_path)
-            required_columns = {"tissue_id", "crop_id", "row", "col"}
+            required_columns = {"tissue_id", "tile_id", "row", "col"}
             if not required_columns.issubset(coords_df.columns):
                 raise ValueError(
                     f"Tile coordinate parquet {tile_coords_path} is missing required columns "
                     f"{sorted(required_columns)}."
                 )
-            coords_df = coords_df.sort_values(["tissue_id", "crop_id"], kind="stable")
+            coords_df = coords_df.sort_values(["tissue_id", "tile_id"], kind="stable")
             self.tile_coordinates = {
                 tissue_id: list(zip(group["row"].astype(int), group["col"].astype(int), strict=False))
                 for tissue_id, group in coords_df.groupby("tissue_id", sort=False)
