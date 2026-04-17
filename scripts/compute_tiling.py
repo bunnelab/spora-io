@@ -8,7 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from spora_io._config import get_datasets_dir
-from spora_io.utils.helpers.crop import best_mask_tiling_try_to_stop
+from spora_io.utils.helpers.tile import best_mask_tiling_try_to_stop
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
         description="Compute tile coordinates from segmentations/<resolution>/tissue_masks and save them as parquet.",
     )
     parser.add_argument("--dataset-name", required=True, help="Dataset name under the datasets root.")
-    parser.add_argument("--crop-size", required=True, type=int, help="Square crop size in pixels.")
+    parser.add_argument("--tile-size", required=True, type=int, help="Square tile size in pixels.")
     parser.add_argument(
         "--resolution",
         type=float,
@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
         "--stride",
         type=int,
         default=None,
-        help="Stride in pixels. Defaults to crop_size // 2.",
+        help="Stride in pixels. Defaults to tile_size // 2.",
     )
     parser.add_argument(
         "--tolerance",
@@ -78,11 +78,11 @@ def build_coordinate_rows(tissue_id: str, tiles: list) -> list[dict[str, int | s
     return [
         {
             "tissue_id": tissue_id,
-            "crop_id": crop_id,
+            "tile_id": tile_id,
             "row": int(tile.y),
             "col": int(tile.x),
         }
-        for crop_id, tile in enumerate(tiles)
+        for tile_id, tile in enumerate(tiles)
     ]
 
 
@@ -90,7 +90,7 @@ def build_stats_row(
     tissue_id: str,
     mask: np.ndarray,
     stats: dict,
-    crop_size: int,
+    tile_size: int,
     stride: int,
     tolerance: float,
     coverage_goal: float,
@@ -107,7 +107,7 @@ def build_stats_row(
         "total_valid_pixels": int(stats["total_valid_pixels"]),
         "candidate_count": int(stats["candidate_count"]),
         "stop_reason": str(stats["stop_reason"]),
-        "crop_size": int(crop_size),
+        "tile_size": int(tile_size),
         "stride": int(stride),
         "tolerance": float(tolerance),
         "coverage_goal": float(coverage_goal),
@@ -121,9 +121,9 @@ def main():
     resolution_dir = resolution_to_dir(args.resolution)
     tissue_masks_dir = dataset_root / "segmentations" / resolution_dir / "tissue_masks"
     tiling_dir = dataset_root / "tiling" / resolution_dir / args.tiling_method
-    coords_path = tiling_dir / f"{args.crop_size}_tile_coordinates.parquet"
-    stats_path = tiling_dir / f"{args.crop_size}_tile_stats.parquet"
-    stride = args.stride if args.stride is not None else args.crop_size // 2
+    coords_path = tiling_dir / f"{args.tile_size}_tile_coordinates.parquet"
+    stats_path = tiling_dir / f"{args.tile_size}_tile_stats.parquet"
+    stride = args.stride if args.stride is not None else args.tile_size // 2
 
     if not dataset_root.exists():
         raise FileNotFoundError(f"Dataset directory does not exist: {dataset_root}")
@@ -149,7 +149,7 @@ def main():
         mask = load_tissue_mask(mask_path)
         tiles, stats, _ = best_mask_tiling_try_to_stop(
             mask=mask,
-            tile_size=args.crop_size,
+            tile_size=args.tile_size,
             stride=stride,
             tolerance=args.tolerance,
             coverage_goal=args.coverage_goal,
@@ -164,7 +164,7 @@ def main():
                 tissue_id=tissue_id,
                 mask=mask,
                 stats=stats,
-                crop_size=args.crop_size,
+                tile_size=args.tile_size,
                 stride=stride,
                 tolerance=args.tolerance,
                 coverage_goal=args.coverage_goal,
@@ -174,7 +174,7 @@ def main():
 
     coordinates_df = pd.DataFrame.from_records(
         coordinate_rows,
-        columns=["tissue_id", "crop_id", "row", "col"],
+        columns=["tissue_id", "tile_id", "row", "col"],
     )
     stats_df = pd.DataFrame.from_records(stats_rows).set_index("tissue_id").sort_index()
 
