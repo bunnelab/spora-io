@@ -349,7 +349,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
 
 
 
-    def get_tile_by_id(self, tissue_id: str, tile_id: int, preprocess=True, kind="uniprot_filtered") -> MultiplexTissue:
+    def get_tile(self, tissue_id: str, tile_id: int, preprocess=True, kind="uniprot_filtered") -> MultiplexTissue:
         """
         Get a specific tile based on the tissue id and tile id
         Args:
