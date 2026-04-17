@@ -32,7 +32,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from spatialprot_data._config import get_datasets_dir
+from spora_io._config import get_datasets_dir
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────

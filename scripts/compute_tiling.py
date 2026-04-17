@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from spatialprot_data._config import get_datasets_dir
-from spatialprot_data.utils.helpers.crop import best_mask_tiling_try_to_stop
+from spora_io._config import get_datasets_dir
+from spora_io.utils.helpers.crop import best_mask_tiling_try_to_stop
 
 
 def parse_args() -> argparse.Namespace:

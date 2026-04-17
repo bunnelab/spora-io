@@ -6,11 +6,11 @@ import os
 import numpy as np
 import pandas as pd
 # New-library unimodal datasets
-from spatialprot_data.datasets.he import HEImagingDataset
-from spatialprot_data.datasets.multiplex import MultiplexImagingDataset
-from spatialprot_data.datasets.ihc import SingleIHCImagingDataset
-from spatialprot_data.datasets._types import ModKey, ComposedTissue
-from spatialprot_data.utils.utils import print_verbose
+from spora_io.datasets.he import HEImagingDataset
+from spora_io.datasets.multiplex import MultiplexImagingDataset
+from spora_io.datasets.ihc import SingleIHCImagingDataset
+from spora_io.datasets._types import ModKey, ComposedTissue
+from spora_io.utils.utils import print_verbose
 
 def _norm_modality_key(mod: ModKey) -> str:
     if isinstance(mod, str):

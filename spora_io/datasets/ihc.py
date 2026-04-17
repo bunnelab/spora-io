@@ -12,9 +12,9 @@ from PIL import Image
 from pathlib import Path
 import zarr
 
-from spatialprot_data.datasets.base import BaseImagingDataset
-from spatialprot_data.utils.utils import is_rank0, print_verbose
-from spatialprot_data.datasets._types import IHCTissue, TissueMask, CellMask, IHCModality
+from spora_io.datasets.base import BaseImagingDataset
+from spora_io.utils.utils import is_rank0, print_verbose
+from spora_io.datasets._types import IHCTissue, TissueMask, CellMask, IHCModality
 
 max_width = int(os.environ.get("MAX_HE_WIDTH", 50000))
 max_height = int(os.environ.get("MAX_HE_HEIGHT", 50000))

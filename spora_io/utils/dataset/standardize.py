@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 from loguru import logger
 
-from spatialprot_data.utils.dataset.transforms import FilterFactory
+from spora_io.utils.dataset.transforms import FilterFactory
 
 
 class BaseStandardizer(ABC):

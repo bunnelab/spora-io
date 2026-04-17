@@ -11,9 +11,9 @@ import argparse
 import os
 from loguru import logger
 
-from spatialprot_data._config import get_datasets_dir
-from spatialprot_data.datasets.multiplex import MultiplexImagingDataset
-from spatialprot_data.utils.helpers.std import (
+from spora_io._config import get_datasets_dir
+from spora_io.datasets.multiplex import MultiplexImagingDataset
+from spora_io.utils.helpers.std import (
     calculate_global_level_quantiles,
     calculate_global_statistics,
     calculate_image_level_quantiles,
@@ -87,7 +87,7 @@ def build_dataset(dataset_root, dataset_name: str, modality: str, resolution: fl
         name=dataset_name,
         path=str(dataset_root),
         resolution=resolution,
-        crop_size=None,
+        tile_size=None,
         load_cell_metadata=False,
         modality=modality,
         standardization="identity",

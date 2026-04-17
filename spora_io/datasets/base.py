@@ -9,9 +9,9 @@ import pandas as pd
 from numpy.typing import NDArray
 from typing import Any, Union, Tuple, Sequence, Callable, Optional
 
-from spatialprot_data.datasets._types import get_modality_from_str, is_valid_modality_instance, ModKey, Tissue, \
+from spora_io.datasets._types import get_modality_from_str, is_valid_modality_instance, ModKey, Tissue, \
                                             TissueMask, CellMask
-from spatialprot_data.utils.utils import print_verbose
+from spora_io.utils.utils import print_verbose
 
 
 

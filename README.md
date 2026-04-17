@@ -19,7 +19,7 @@ pip install -e ".[dev]"
 ## Quick Start
 
 ```python
-from spatialprot_data import HEImagingDataset, MultiplexImagingDataset, ComposedImagingDataset
+from spora_io import HEImagingDataset, MultiplexImagingDataset, ComposedImagingDataset
 
 # Load an H&E dataset
 he_dataset = HEImagingDataset(

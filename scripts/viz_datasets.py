@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -13,7 +12,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import DataTable, Footer, Header, Input, Label, Select, Static, TabbedContent, TabPane
 
-from spatialprot_data._config import get_datasets_dir
+from spora_io._config import get_datasets_dir
 
 SUPPORTED_ROOT_MODALITIES = ("he", "imc", "codex", "cycif", "ihc")
 SIMPLE_MODALITIES = ("he", "imc", "codex", "cycif")
@@ -48,19 +47,14 @@ def discover_loader_modalities(dataset_dir: Path, metadata_modalities: list[str]
     return sorted(modalities)
 
 
-def summarize_crop_json(json_path: Path) -> tuple[int, int]:
+def summarize_tile_parquet(parquet_path: Path) -> tuple[int, int]:
     try:
-        payload = json.loads(json_path.read_text())
+        df = pd.read_parquet(parquet_path, columns=["tissue_id"])
     except Exception:
         return 0, 0
-    if not isinstance(payload, dict):
-        return 0, 0
-    tissue_count = len(payload)
-    crop_count = 0
-    for coords in payload.values():
-        if isinstance(coords, list):
-            crop_count += len(coords)
-    return tissue_count, crop_count
+    tissue_count = df["tissue_id"].astype(str).nunique() if "tissue_id" in df.columns else 0
+    crop_count = len(df)
+    return int(tissue_count), int(crop_count)
 
 
 def discover_standardization_specs(modality_dir: Path) -> list[str]:
@@ -120,12 +114,37 @@ def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
         loader_modalities = discover_loader_modalities(dataset_dir, metadata_modalities)
         on_disk_roots = sorted(path.name for path in dataset_dir.iterdir() if path.is_dir() and path.name in SUPPORTED_ROOT_MODALITIES)
 
-        dataset_total_crops = 0
-        dataset_crop_specs = 0
         dataset_std_specs = 0
         dataset_image_files = 0
         dataset_crop_counts_by_size: dict[str, int] = {}
         resolution_union: set[str] = set()
+        shared_crop_specs: list[str] = []
+
+        tiling_root = dataset_dir / "tiling"
+        if tiling_root.exists():
+            for resolution_dir in sorted(path for path in tiling_root.iterdir() if path.is_dir() and path.name.endswith("mpp")):
+                for method_dir in sorted(path for path in resolution_dir.iterdir() if path.is_dir()):
+                    for parquet_path in sorted(method_dir.glob("*_tile_coordinates.parquet")):
+                        tissues_with_crops, crop_count = summarize_tile_parquet(parquet_path)
+                        crop_size = parquet_path.stem.removesuffix("_tile_coordinates")
+                        crop_spec = f"{resolution_dir.name}/{method_dir.name}/{crop_size}"
+                        shared_crop_specs.append(crop_spec)
+                        dataset_crop_counts_by_size[crop_size] = dataset_crop_counts_by_size.get(crop_size, 0) + crop_count
+                        crop_rows.append(
+                            {
+                                "dataset": dataset_dir.name,
+                                "resolution": resolution_dir.name,
+                                "tiling_method": method_dir.name,
+                                "crop_file": parquet_path.name,
+                                "crop_size": crop_size,
+                                "tissues_with_crops": tissues_with_crops,
+                                "num_crops": crop_count,
+                                "path": str(parquet_path),
+                            }
+                        )
+
+        dataset_total_crops = sum(dataset_crop_counts_by_size.values())
+        dataset_crop_specs = len(shared_crop_specs)
 
         for modality in loader_modalities:
             root = expected_root(modality)
@@ -165,35 +184,9 @@ def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
                 except Exception:
                     pass
 
-            seg_base = dataset_dir / "segmentations" / (modality if modality.startswith("ihc_") else root)
-            crop_dir = seg_base / "crop_coordinates"
-            crop_specs: list[str] = []
-            modality_crop_total = 0
-            modality_crop_counts_by_size: dict[str, int] = {}
-            if crop_dir.exists():
-                for resolution_dir in sorted(path for path in crop_dir.iterdir() if path.is_dir()):
-                    for json_path in sorted(resolution_dir.glob("*.json")):
-                        tissues_with_crops, crop_count = summarize_crop_json(json_path)
-                        crop_size = json_path.stem.replace("_tiles_coordinates", "")
-                        crop_spec = f"{resolution_dir.name}/{crop_size}"
-                        crop_specs.append(crop_spec)
-                        modality_crop_total += crop_count
-                        modality_crop_counts_by_size[crop_size] = modality_crop_counts_by_size.get(crop_size, 0) + crop_count
-                        dataset_crop_counts_by_size[crop_size] = dataset_crop_counts_by_size.get(crop_size, 0) + crop_count
-                        crop_rows.append(
-                            {
-                                "dataset": dataset_dir.name,
-                                "modality": modality,
-                                "resolution": resolution_dir.name,
-                                "crop_file": json_path.name,
-                                "crop_size": crop_size,
-                                "tissues_with_crops": tissues_with_crops,
-                                "num_crops": crop_count,
-                                "path": str(json_path),
-                            }
-                        )
-            dataset_total_crops += modality_crop_total
-            dataset_crop_specs += len(crop_specs)
+            crop_specs = shared_crop_specs
+            modality_crop_total = dataset_total_crops
+            modality_crop_counts_by_size = dataset_crop_counts_by_size
 
             std_specs = discover_standardization_specs(modality_dir) if root in MULTIPLEX_MODALITIES else []
             dataset_std_specs += len(std_specs)
@@ -263,7 +256,7 @@ def load_inventory() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
 
     crop_df = pd.DataFrame(crop_rows)
     if not crop_df.empty:
-        crop_df = crop_df.sort_values(["dataset", "modality", "resolution", "crop_size"]).reset_index(drop=True)
+        crop_df = crop_df.sort_values(["dataset", "resolution", "tiling_method", "crop_size"]).reset_index(drop=True)
 
     std_df = pd.DataFrame(std_rows)
     if not std_df.empty:
@@ -379,7 +372,7 @@ class SummaryView(Widget):
         self.query_one("#m-datasets", Static).update(metric(int(len(dataset_df)), "datasets"))
         self.query_one("#m-modalities", Static).update(metric(int(len(modality_df)), "modalities"))
         self.query_one("#m-images", Static).update(metric(int(dataset_df["images_best_resolution_total"].fillna(0).sum()) if not dataset_df.empty else 0, "images"))
-        self.query_one("#m-crops", Static).update(metric(int(dataset_df["num_crop_specs"].fillna(0).sum()) if not dataset_df.empty else 0, "crop files"))
+        self.query_one("#m-crops", Static).update(metric(int(dataset_df["num_crop_specs"].fillna(0).sum()) if not dataset_df.empty else 0, "tile files"))
         self.query_one("#m-std", Static).update(metric(int(dataset_df["num_standardization_specs"].fillna(0).sum()) if not dataset_df.empty else 0, "std specs"))
         for crop_size in self._crop_sizes:
             self.query_one(f"#m-crop-size-{crop_size}", Static).update(
@@ -405,7 +398,7 @@ class SummaryView(Widget):
             "Dataset",
             "Modalities",
             "Images",
-            "Crop files",
+            "Tile files",
             "Crop counts by size",
             "Std specs",
             "Resolutions",
@@ -461,7 +454,7 @@ class ExplorerView(Widget):
 
     def compose(self) -> ComposeResult:
         yield Static(
-            "Inspect one dataset at a time. The left table compares modalities; the right panel shows the selected modality, including crop files split by resolution and crop size.",
+            "Inspect one dataset at a time. The left table compares modalities; the right panel shows the selected modality, including shared tile coordinate files split by resolution, method, and crop size.",
             id="explorer-help",
         )
         with Horizontal(id="picker-row"):
@@ -474,7 +467,7 @@ class ExplorerView(Widget):
                 yield Static("", id="dataset-stats")
                 yield Label("[bold]Selected modality[/]")
                 yield Static("", id="modality-stats")
-                yield Label("[bold]Crop files by size[/]")
+                yield Label("[bold]Shared Tile Files[/]")
                 yield DataTable(id="crop-table", cursor_type="row")
                 yield Label("[bold]Standardization specs[/]")
                 yield DataTable(id="std-table", cursor_type="row")
@@ -567,7 +560,7 @@ class ExplorerView(Widget):
             f"Loader modalities: [bold]{dataset_row['loader_modalities'] or '-'}[/]\n"
             f"Resolutions: [bold]{dataset_row['resolutions'] or '-'}[/]\n"
             f"Images: [bold]{dataset_row['images_best_resolution_total']}[/]\n"
-            f"Crop files: [bold]{dataset_row['num_crop_specs']}[/]\n"
+            f"Tile files: [bold]{dataset_row['num_crop_specs']}[/]\n"
             f"Total crops: [bold]{dataset_row['total_crops']}[/]\n"
             f"Standardization specs: [bold]{dataset_row['num_standardization_specs']}[/]\n\n"
             f"[dim]{dataset_row['metadata_path']}[/]"
@@ -577,7 +570,7 @@ class ExplorerView(Widget):
         modality_table = self.query_one("#modality-table", DataTable)
         modality_table.clear(columns=True)
         modality_table.add_columns(
-            "Modality", "Tissues", "Images by res", "Crop files", "Crop sizes", "Std specs", "Channels"
+            "Modality", "Tissues", "Images by res", "Tile files", "Tile specs", "Std specs", "Channels"
         )
         for _, row in modality_rows.iterrows():
             crop_sizes = str(row["crop_specs"]) if row["crop_specs"] else "-"
@@ -598,7 +591,7 @@ class ExplorerView(Widget):
             crop_table = self.query_one("#crop-table", DataTable)
             crop_table.clear(columns=True)
             crop_table.add_columns("Status")
-            crop_table.add_row("No crop coordinate files found")
+            crop_table.add_row("No tile coordinate files found")
             std_table = self.query_one("#std-table", DataTable)
             std_table.clear(columns=True)
             std_table.add_columns("Status")
@@ -626,11 +619,9 @@ class ExplorerView(Widget):
 
         row = modality_match.iloc[0]
         if crop_rows is None:
-            crop_rows = self._crop_df.loc[
-                (self._crop_df["dataset"] == dataset) & (self._crop_df["modality"] == modality)
-            ].copy() if not self._crop_df.empty else pd.DataFrame()
+            crop_rows = self._crop_df.loc[self._crop_df["dataset"] == dataset].copy() if not self._crop_df.empty else pd.DataFrame()
         else:
-            crop_rows = crop_rows.loc[crop_rows["modality"] == modality].copy() if not crop_rows.empty else pd.DataFrame()
+            crop_rows = crop_rows.copy() if not crop_rows.empty else pd.DataFrame()
         if std_rows is None:
             std_rows = self._std_df.loc[
                 (self._std_df["dataset"] == dataset) & (self._std_df["modality"] == modality)
@@ -650,8 +641,8 @@ class ExplorerView(Widget):
             f"Channel count: [bold]{row['channel_count']}[/]\n"
             f"QC-pass channels: [bold]{row['qc_pass_count']}[/]\n"
             f"is_nuclear_marker column: [bold]{row['has_is_nuclear_marker']}[/]\n"
-            f"Crop files: [bold]{row['num_crop_specs']}[/]\n"
-            f"Crop sizes: [bold]{row['crop_specs'] or '-'}[/]\n"
+            f"Shared tile files: [bold]{row['num_crop_specs']}[/]\n"
+            f"Tile specs: [bold]{row['crop_specs'] or '-'}[/]\n"
             f"Total crops: [bold]{row['total_crops']}[/]\n"
             f"Standardization specs: [bold]{row['standardization_specs'] or '-'}[/]"
         )
@@ -661,12 +652,13 @@ class ExplorerView(Widget):
         crop_table.clear(columns=True)
         if crop_rows.empty:
             crop_table.add_columns("Status")
-            crop_table.add_row("No crop coordinate files found")
+            crop_table.add_row("No tile coordinate files found")
         else:
-            crop_table.add_columns("Resolution", "Crop size", "Tissues", "Crops", "File")
+            crop_table.add_columns("Resolution", "Method", "Crop size", "Tissues", "Crops", "File")
             for _, crop_row in crop_rows.iterrows():
                 crop_table.add_row(
                     str(crop_row["resolution"]),
+                    str(crop_row["tiling_method"]),
                     str(crop_row["crop_size"]),
                     str(crop_row["tissues_with_crops"]),
                     str(crop_row["num_crops"]),

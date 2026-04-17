@@ -1,4 +1,4 @@
-from spatialprot_data.utils.utils import (
+from spora_io.utils.utils import (
     is_rank0,
     print_verbose,
     set_seed,

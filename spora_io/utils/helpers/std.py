@@ -9,7 +9,7 @@ from loguru import logger
 from tqdm import tqdm
 from typing import Optional
 from numpy.typing import ArrayLike
-from spatialprot_data.utils.dataset.transforms import CustomGaussianBlur
+from spora_io.utils.dataset.transforms import CustomGaussianBlur
 
 
 def load_tissue_and_mask(dataset, tissue_id: str):
@@ -92,7 +92,7 @@ def calculate_image_level_quantiles(
             # Get channel names for this tissue
             tissue_channel_names = dataset.get_channel_names(tissue_id, kind="complete")
             
-            for channel_name in channel_names:
+            for channel_name in tqdm(channel_names, desc='Looping channels', leave=False):
                 if channel_name in tissue_channel_names:
                     # Find index in the loaded image
                     channel_idx = np.where(tissue_channel_names == channel_name)[0][0]
@@ -100,6 +100,7 @@ def calculate_image_level_quantiles(
 
                     # Apply tissue mask 
                     channel_img = channel_img[tissue_mask]
+                    logger.debug(f"channel_img shape: {channel_img.shape}")
                     
                     # Calculate quantile
                     q_upper = np.quantile(channel_img, upper_quantile)

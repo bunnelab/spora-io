@@ -13,11 +13,11 @@ from typing import List, Tuple, Optional
 import zarr
 import json
 
-from spatialprot_data.datasets.base import BaseImagingDataset
-from spatialprot_data.utils.dataset.standardize import build_standardizer
-from spatialprot_data.utils.utils import print_verbose
-from spatialprot_data.utils.dataset.transforms import FilterFactory
-from spatialprot_data.datasets._types import MultiplexTissue, TissueMask, CellMask
+from spora_io.datasets.base import BaseImagingDataset
+from spora_io.utils.dataset.standardize import build_standardizer
+from spora_io.utils.utils import print_verbose
+from spora_io.utils.dataset.transforms import FilterFactory
+from spora_io.datasets._types import MultiplexTissue, TissueMask, CellMask
 
 class MultiplexImagingDataset(BaseImagingDataset):
     """
