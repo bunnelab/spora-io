@@ -35,6 +35,8 @@ dependencies = [
     "Pillow>=9.0",
     "safetensors>=0.3",
     "tqdm>=4.60",
+    "pyarrow>=17.0.0",
+    "fastparquet>=2024.11.0"
 ]
 
 [project.optional-dependencies]
