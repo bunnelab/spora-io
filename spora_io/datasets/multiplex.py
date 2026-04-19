@@ -71,7 +71,6 @@ class MultiplexImagingDataset(BaseImagingDataset):
         default_image_channel_map_path = self.path / self.modality.canonical_dir / f"channels_per_tissue.parquet"
         if default_image_channel_map_path.exists():
             self.image_channel_map = pd.read_parquet(default_image_channel_map_path)
-            self.image_channel_map.set_index("tissue_id", inplace=True)
             if self.verbose:
                 print_verbose(f"Using image-channel map from {default_image_channel_map_path}")
         else:

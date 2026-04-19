@@ -108,11 +108,11 @@ dataset_name/
 | Column | Type | Description |
 |--------|------|-------------|
 | `channel_name` | str | Unique channel/marker name |
-| `index` | int | Channel index (contiguous, starting at 0) |
 | `qc_pass` | bool | Whether the channel passes quality control |
 | `uniprot_id` | str | UniProt protein identifier for marker embeddings |
+| `is_nuclear_marker` | bool | Indicates nucleus segmentation markers |
 
-**`channels_per_tissue.parquet`** — boolean matrix indicating channel availability per tissue. Columns: `tissue_id` + one column per channel name.
+**`channels_per_tissue.parquet`** — boolean matrix indicating channel availability per tissue. Index: `tissue_id`. Columns: One column per channel name following order of `channels.parquet`.
 
 **`cells.parquet`** (optional) — cell-level annotations with at least `tissue_id` and `cell_id` columns.
 
