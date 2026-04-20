@@ -79,6 +79,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help="Resolution in mpp.",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Whether to overwrite existing statistics. By default, if statistics already exist for the given dataset, modality, method, quantile level, stats level, and resolution, the script will skip computation.",
+    )
     return parser.parse_args()
 
 
@@ -132,30 +137,31 @@ def main():
     logger.info(f"Output directory: {output_dir}")
     os.makedirs(output_dir, exist_ok=True)
 
-    check_files = []
-    if quantile_level == "image":
-        check_files.append(output_dir / "image_level_upper_quantiles.parquet")
-        if lower_quantile is not None:
-            check_files.append(output_dir / "image_level_lower_quantiles.parquet")
-    else:
-        check_files.append(output_dir / "global_level_upper_quantiles.parquet")
-        if lower_quantile is not None:
-            check_files.append(output_dir / "global_level_lower_quantiles.parquet")
+    if not args.overwrite:
+        check_files = []
+        if quantile_level == "image":
+            check_files.append(output_dir / "image_level_upper_quantiles.parquet")
+            if lower_quantile is not None:
+                check_files.append(output_dir / "image_level_lower_quantiles.parquet")
+        else:
+            check_files.append(output_dir / "global_level_upper_quantiles.parquet")
+            if lower_quantile is not None:
+                check_files.append(output_dir / "global_level_lower_quantiles.parquet")
 
-    if stats_level == "image":
-        check_files.append(output_dir / "image_level_means.parquet")
-        check_files.append(output_dir / "image_level_stds.parquet")
-    else:
-        check_files.append(output_dir / "global_level_means.parquet")
-        check_files.append(output_dir / "global_level_stds.parquet")
+        if stats_level == "image":
+            check_files.append(output_dir / "image_level_means.parquet")
+            check_files.append(output_dir / "image_level_stds.parquet")
+        else:
+            check_files.append(output_dir / "global_level_means.parquet")
+            check_files.append(output_dir / "global_level_stds.parquet")
 
-    if all(f.exists() for f in check_files):
-        logger.info(
-            f"Statistics already computed for {dataset_name} with method {base_method} with specific name {method_name} "
-            f"at resolution {resolution} for modality {modality}. Skipping computation."
-        )
-        logger.info(f"Quantile level: {quantile_level}, Stats level: {stats_level}")
-        return
+        if all(f.exists() for f in check_files):
+            logger.info(
+                f"Statistics already computed for {dataset_name} with method {base_method} with specific name {method_name} "
+                f"at resolution {resolution} for modality {modality}. Skipping computation."
+            )
+            logger.info(f"Quantile level: {quantile_level}, Stats level: {stats_level}")
+            return
 
     logger.info(f"Found {len(channel_names)} channels")
 
