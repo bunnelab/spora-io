@@ -14,7 +14,7 @@ from loguru import logger
 import pandas as pd
 from numpy.typing import NDArray
 from typing import Any, Union, Tuple, Sequence, Callable, Optional
-
+import torch
 from spora_io.datasets._types import get_modality_from_str, is_valid_modality_instance, ModKey, Tissue, \
                                             TissueMask, CellMask
 from spora_io.utils.utils import print_verbose
@@ -36,7 +36,7 @@ class BaseImagingDataset(ABC):
         label (Optional[str]): The name of the label column in the tissue metadata. If None, no labels will be loaded.
         labels_to_keep (Optional[Sequence[str]]): The list of label values to keep if label is not None. If None, all labels will be kept.
         label_modifying_fn (Optional[Callable]): A function to modify the labels after loading. For example, this can be used to binarize labels or group certain labels together. If None, labels will not be modified.
-        label_type (str): The type of the label, either "classification" or "regression". This is used to determine how to encode the labels. Default
+        label_type (str): The type of the label, either "classification" or "regression". This is used to determine how to encode the labels. Default is "classification".
     """
 
     def __init__(self, 
@@ -206,7 +206,7 @@ class BaseImagingDataset(ABC):
         ci_mask_path = self.path / "segmentations" / self.resolution / "cell_masks" / "instances" / f"{tissue_id}.npz"
         if not ci_mask_path.exists():
             raise ValueError(f"Cell instance mask file {ci_mask_path} does not exist for tissue_id {tissue_id}.")
-        mask = np.load(ci_mask_path)["mask"]
+        mask = torch.from_numpy(np.load(ci_mask_path)["mask"])  
         return CellMask(
             mask=mask,
             tissue_id=tissue_id
@@ -233,7 +233,7 @@ class BaseImagingDataset(ABC):
             setattr(self, f"{mask_type}_label_encoder", label_encoder)
             setattr(self, f"{mask_type}_mapping", mapping)
         # label_encoder is df with columns name and id 
-        mask = np.load(ct_mask_path)["mask"]
+        mask = torch.from_numpy(np.load(ct_mask_path)["mask"])
         return CellMask(
             mask=mask,
             tissue_id=tissue_id,
