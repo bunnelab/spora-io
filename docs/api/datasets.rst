@@ -1,37 +1,40 @@
 Dataset Classes
 ===============
 
+These classes define the main loading interfaces for the current on-disk
+dataset format.
+
 Base
 ----
 
-.. autoclass:: spatialprot_data.BaseImagingDataset
+.. autoclass:: spora_io.datasets.base.BaseImagingDataset
    :members:
    :show-inheritance:
 
 H&E
 ---
 
-.. autoclass:: spatialprot_data.HEImagingDataset
+.. autoclass:: spora_io.datasets.he.HEImagingDataset
    :members:
    :show-inheritance:
 
 Multiplex (IMC, CODEX, CycIF, etc.)
---------------------------------
+-----------------------------------
 
-.. autoclass:: spatialprot_data.MultiplexImagingDataset
+.. autoclass:: spora_io.datasets.multiplex.MultiplexImagingDataset
    :members:
    :show-inheritance:
 
 IHC
 ---
 
-.. autoclass:: spatialprot_data.SingleIHCImagingDataset
+.. autoclass:: spora_io.datasets.ihc.SingleIHCImagingDataset
    :members:
    :show-inheritance:
 
 Composed (Multi-modal)
 -----------------------
 
-.. autoclass:: spatialprot_data.ComposedImagingDataset
+.. autoclass:: spora_io.datasets.compose.ComposedImagingDataset
    :members:
    :show-inheritance:

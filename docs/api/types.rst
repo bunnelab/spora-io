@@ -4,48 +4,48 @@ Data Types
 Modalities
 ----------
 
-.. autoclass:: spatialprot_data.HEModality
+.. autoclass:: spora_io.datasets._types.HEModality
    :members:
 
-.. autoclass:: spatialprot_data.IHCModality
+.. autoclass:: spora_io.datasets._types.IHCModality
    :members:
 
-.. autoclass:: spatialprot_data.IMCModality
+.. autoclass:: spora_io.datasets._types.IMCModality
    :members:
 
-.. autoclass:: spatialprot_data.CODEXModality
+.. autoclass:: spora_io.datasets._types.CODEXModality
    :members:
 
-.. autoclass:: spatialprot_data.CycIFModality
+.. autoclass:: spora_io.datasets._types.CycIFModality
    :members:
 
 Tissue Types
 ------------
 
-.. autoclass:: spatialprot_data.HETissue
+.. autoclass:: spora_io.datasets._types.HETissue
    :members:
 
-.. autoclass:: spatialprot_data.MultiplexTissue
+.. autoclass:: spora_io.datasets._types.MultiplexTissue
    :members:
 
-.. autoclass:: spatialprot_data.IHCTissue
+.. autoclass:: spora_io.datasets._types.IHCTissue
    :members:
 
-.. autoclass:: spatialprot_data.ComposedTissue
+.. autoclass:: spora_io.datasets._types.ComposedTissue
    :members:
 
 Masks
 -----
 
-.. autoclass:: spatialprot_data.TissueMask
+.. autoclass:: spora_io.datasets._types.TissueMask
    :members:
 
-.. autoclass:: spatialprot_data.CellMask
+.. autoclass:: spora_io.datasets._types.CellMask
    :members:
 
 Utility Functions
 -----------------
 
-.. autofunction:: spatialprot_data.get_modality_from_str
+.. autofunction:: spora_io.datasets._types.get_modality_from_str
 
-.. autofunction:: spatialprot_data.is_valid_modality_instance
+.. autofunction:: spora_io.datasets._types.is_valid_modality_instance

@@ -1,16 +1,17 @@
 Changelog
 =========
 
-v0.1.0 (2025)
---------------
+Current Snapshot
+----------------
 
-Initial release.
+This documentation reflects the current codebase state rather than a published
+release tag.
 
 - Dataset classes for H&E, IHC, IMC, CODEX, and CycIF modalities
 - ``ComposedImagingDataset`` for multi-modal loading
-- Normalization framework (identity, Q99 clipping)
+- Stats-backed multiplex standardization framework
 - Channel selection transforms for data augmentation
 - Greedy tiling algorithm with adaptive stopping
-- ESM protein embedding integration for marker filtering
-- Tissue and cell mask support
+- Shared tissue masks and cell masks under ``segmentations/<resolution>/``
+- Shared parquet-backed tiling under ``tiling/<resolution>/<strategy>/``
 - Label filtering by metadata columns

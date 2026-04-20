@@ -1,11 +1,11 @@
-"""Sphinx configuration for spatialprot-data."""
+"""Sphinx configuration for spora-io."""
 
 import os
 import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
-project = "spatialprot-data"
+project = "spora-io"
 copyright = "2025, Bunne Lab"
 author = "Eeshaan Jain, Lukas Klein"
 

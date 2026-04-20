@@ -1,9 +1,24 @@
-spatialprot-data
-================
+spora-io
+========
 
-Data structures and loaders for spatial proteomics datasets. Provides a unified
-interface for loading and working with multi-modal imaging data including H&E,
-IHC, IMC, CODEX, and CycIF.
+``spora_io`` provides typed dataset loaders and utility code for spatial
+proteomics datasets in the current on-disk format.
+
+The library supports:
+
+- H&E datasets
+- single-marker IHC datasets
+- multiplex datasets such as IMC, CODEX, and CycIF
+- composed multi-modal loading across multiple unimodal datasets
+- shared tissue masks, cell masks, tiling, and multiplex standardization stats
+
+The current dataset format uses:
+
+- modality-specific image roots under ``<modality>/<resolution>/images``
+- shared segmentations under ``segmentations/<resolution>/...``
+- shared tiling under ``tiling/<resolution>/<strategy>/...``
+- multiplex standardization stats under
+  ``<modality>/<resolution>/standardization/<spec>/...``
 
 .. toctree::
    :maxdepth: 2
