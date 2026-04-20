@@ -60,7 +60,7 @@ class BaseImagingDataset(ABC):
             except Exception as e:
                 print_verbose(f"Failed auto-conversion of resolution argument. Expected str/float, but got {type(self.resolution)}")
                 raise e
-        self.resolution = f"{str(self.resolution).replace(".", "_")}mpp"
+        self.resolution = f"{str(self.resolution).replace('.', '_')}mpp"
 
         if isinstance(modality, str):
             self.modality = get_modality_from_str(modality)
