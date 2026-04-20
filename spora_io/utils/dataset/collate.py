@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Tuple, TypeAlias
+from typing import Any, List, Tuple, TypeAlias, Union
 
 import torch
 
@@ -8,7 +8,7 @@ from spora_io.datasets._types import ComposedTissue, Tissue
 
 Image = Tissue | ComposedTissue
 ChannelMetadata: TypeAlias = Any
-CollatedImage: TypeAlias = torch.Tensor | dict[str, torch.Tensor]
+CollatedImage: TypeAlias = Union[torch.Tensor, dict[str, torch.Tensor]]
 CollatedChannels: TypeAlias = Any
 
 

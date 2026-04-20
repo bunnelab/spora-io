@@ -6,13 +6,13 @@ Loading an H&E dataset
 
 .. code-block:: python
 
-   from spatialprot_data import HEImagingDataset
+   from spora_io import HEImagingDataset
 
    dataset = HEImagingDataset(
        name="my_dataset",
        path="/path/to/dataset",
        resolution=1.0,
-       crop_size=224,
+       tile_size=224,
    )
 
    tissue_ids = dataset.get_tissue_ids()
@@ -24,56 +24,60 @@ Loading a multiplex dataset
 
 .. code-block:: python
 
-   from spatialprot_data import MultiplexImagingDataset
+   from spora_io import MultiplexImagingDataset
 
    dataset = MultiplexImagingDataset(
        name="my_dataset",
        path="/path/to/dataset",
-       modality="cycif",        # or "imc", "codex"
-       normalization="identity", # or "q99_clipping"
+       modality="cycif",            # or "imc", "codex"
+       standardization="identity",  # or "quantile_clipping/uq_0.99"
        resolution=1.0,
-       crop_size=224,
+       tile_size=224,
    )
 
-   tissue = dataset.get_tissue(tissue_ids[0], kind="filtered")
+   tissue_ids = dataset.get_tissue_ids()
+   tissue = dataset.get_tissue(tissue_ids[0], kind="uniprot_filtered")
    # tissue.tissue is a torch.Tensor of shape (C, H, W)
    # tissue.channel_names contains the marker names
+   # tissue.uniprot_ids contains the aligned UniProt IDs when available
 
 Composing multiple modalities
 ------------------------------
 
 .. code-block:: python
 
-   from spatialprot_data import ComposedImagingDataset
+   from spora_io import ComposedImagingDataset
 
    dataset = ComposedImagingDataset(
        name="my_dataset",
        path="/path/to/dataset",
        modalities=["he", "cycif"],
        resolution=1.0,
-       crop_size=224,
-       modality_kwargs={"cycif": {"normalization": "identity"}},
+        crop_size=224,
+       modality_kwargs={"cycif": {"standardization": "identity"}},
    )
 
    composed = dataset.get_composed_tissue(tissue_ids[0])
    # composed.modalities["he"] -> HETissue
    # composed.modalities["cycif"] -> MultiplexTissue
 
-Retrieving crops
+Retrieving tiles
 ----------------
 
-Crops are fixed-size tiles precomputed from tissue masks. Pass a ``tissue_id``
-and ``crop_id`` to retrieve a single tile:
+Tiles are fixed-size crops precomputed from shared tissue masks and stored in
+``tiling/<resolution>/<strategy>/<size>_tile_coordinates.parquet``.
+
+Pass a ``tissue_id`` and ``tile_id`` to retrieve a single tile:
 
 .. code-block:: python
 
-   # H&E crop
-   he_crop = he_dataset.get_crop(tissue_ids[0], crop_id=0)
-   # he_crop.tissue shape: (3, 224, 224)
+   # H&E tile
+   he_tile = he_dataset.get_tile(tissue_ids[0], tile_id=0)
+   # he_tile.tissue shape: (3, 224, 224)
 
-   # Multiplex crop
-   mx_crop = mx_dataset.get_crop(tissue_ids[0], crop_id=0, kind="complete")
-   # mx_crop.tissue shape: (C, 224, 224)
+   # Multiplex tile
+   mx_tile = mx_dataset.get_tile(tissue_ids[0], tile_id=0, kind="complete")
+   # mx_tile.tissue shape: (C, 224, 224)
 
 Inspecting channel metadata
 ----------------------------
@@ -83,7 +87,7 @@ The multiplex dataset exposes channel-level metadata:
 .. code-block:: python
 
    # Full channel list (DataFrame)
-   dataset.channel_list[["channel_name", "qc_pass", "uniprot_id"]]
+   dataset.channel_list[["channel_name", "qc_pass", "uniprot_id", "is_nuclear_marker"]]
 
    # Per-tissue channel availability matrix
    dataset.image_channel_map.head()
@@ -117,7 +121,7 @@ Filter tissues by metadata columns at dataset construction time:
        name="my_dataset",
        path="/path/to/dataset",
        resolution=1.0,
-       crop_size=224,
+       tile_size=224,
        label="Histology",
        labels_to_keep=["Adenocarcinoma", "Mucinous"],
        label_type="classification",
@@ -126,3 +130,34 @@ Filter tissues by metadata columns at dataset construction time:
    # Only tissues matching the filter are loaded
    print(dataset.unique_labels)    # array of kept label values
    print(dataset.label_encoder)    # {label: int} mapping
+
+Using The Shared Dataset Layout
+-------------------------------
+
+The library expects the current dataset format. The most important pieces are:
+
+.. code-block:: text
+
+   my_dataset/
+   ├── metadata/
+   │   └── tissues.parquet
+   ├── he/
+   │   └── 1_0mpp/
+   │       └── images/
+   ├── codex/
+   │   ├── channels.parquet
+   │   ├── channels_per_tissue.parquet
+   │   └── 1_0mpp/
+   │       ├── images/
+   │       └── standardization/
+   │           └── quantile_clipping/
+   │               └── uq_0.99/
+   ├── segmentations/
+   │   └── 1_0mpp/
+   │       ├── tissue_masks/
+   │       └── cell_masks/
+   └── tiling/
+       └── 1_0mpp/
+           └── default/
+               ├── 224_tile_coordinates.parquet
+               └── 224_tile_stats.parquet

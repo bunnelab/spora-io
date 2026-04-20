@@ -1,3 +1,9 @@
+"""Base class for all imaging datasets. 
+
+Defines the interface for loading tissue images, tissue masks, and cell masks, as well as patient-level retrieval. Also includes functionality for loading tile coordinates if tiling is used in the dataset.
+Supports lazy loading of tissue masks and tiles. 
+"""
+
 from __future__ import annotations
 
 import os
@@ -8,7 +14,7 @@ from loguru import logger
 import pandas as pd
 from numpy.typing import NDArray
 from typing import Any, Union, Tuple, Sequence, Callable, Optional
-
+import torch
 from spora_io.datasets._types import get_modality_from_str, is_valid_modality_instance, ModKey, Tissue, \
                                             TissueMask, CellMask
 from spora_io.utils.utils import print_verbose
@@ -19,6 +25,18 @@ from spora_io.utils.utils import print_verbose
 class BaseImagingDataset(ABC):
     """
     Base class for all imaging datasets.
+
+    Attributes:
+        name (str): The name of the dataset.
+        path (Path): The root path to the dataset.
+        modality (ModKey): The modality of the dataset.
+        resolution (str): The resolution of the dataset in mpp, formatted as a string with underscores instead of decimals (e.g. "0_5mpp").
+        tile_size (Optional[int]): The tile size in pixels. If None, tiling functionality will be disabled.
+        tile_strategy (Optional[str]): The tiling strategy used for the dataset. If None, defaults to "default". This is used to determine the subdirectory under tiling/<resolution>/ where tile coordinates are stored.
+        label (Optional[str]): The name of the label column in the tissue metadata. If None, no labels will be loaded.
+        labels_to_keep (Optional[Sequence[str]]): The list of label values to keep if label is not None. If None, all labels will be kept.
+        label_modifying_fn (Optional[Callable]): A function to modify the labels after loading. For example, this can be used to binarize labels or group certain labels together. If None, labels will not be modified.
+        label_type (str): The type of the label, either "classification" or "regression". This is used to determine how to encode the labels. Default is "classification".
     """
 
     def __init__(self, 
@@ -60,7 +78,7 @@ class BaseImagingDataset(ABC):
             except Exception as e:
                 print_verbose(f"Failed auto-conversion of resolution argument. Expected str/float, but got {type(self.resolution)}")
                 raise e
-        self.resolution = f"{str(self.resolution).replace(".", "_")}mpp"
+        self.resolution = f"{str(self.resolution).replace('.', '_')}mpp"
 
         if isinstance(modality, str):
             self.modality = get_modality_from_str(modality)
@@ -176,14 +194,11 @@ class BaseImagingDataset(ABC):
             Tissue: The tile image as a Tissue instance.
         """
 
-    def get_cell_instance_mask(self, tissue_id: str, match_tissue_resolution: bool = False) -> CellMask:
+    def get_cell_instance_mask(self, tissue_id: str) -> CellMask:
         """
         Get the cell instance mask for a given tissue id.
         Args:
             tissue_id (str): The tissue ID to retrieve the cell instance mask for.
-            match_tissue_resolution (bool): If True, downsample the mask to match
-                the dataset's working resolution using nearest-neighbor interpolation.
-                Default is False (return at native resolution).
         Returns:
             CellMask: The cell instance mask as a CellMask instance.
 
@@ -191,13 +206,7 @@ class BaseImagingDataset(ABC):
         ci_mask_path = self.path / "segmentations" / self.resolution / "cell_masks" / "instances" / f"{tissue_id}.npz"
         if not ci_mask_path.exists():
             raise ValueError(f"Cell instance mask file {ci_mask_path} does not exist for tissue_id {tissue_id}.")
-        mask = np.load(ci_mask_path)["mask"]
-        if match_tissue_resolution:
-            target_h, target_w = self._get_tissue_size(tissue_id, image_mode="CHW")[1:]
-            if mask.shape != (target_h, target_w):
-                from PIL import Image
-                mask = np.array(Image.fromarray(mask).resize((target_w, target_h), Image.NEAREST))
-        mask = mask.astype(np.int32)
+        mask = torch.from_numpy(np.load(ci_mask_path)["mask"].astype(np.int32))
         return CellMask(
             mask=mask,
             tissue_id=tissue_id
@@ -224,7 +233,7 @@ class BaseImagingDataset(ABC):
             setattr(self, f"{mask_type}_label_encoder", label_encoder)
             setattr(self, f"{mask_type}_mapping", mapping)
         # label_encoder is df with columns name and id 
-        mask = np.load(ct_mask_path)["mask"]
+        mask = torch.from_numpy(np.load(ct_mask_path)["mask"])
         return CellMask(
             mask=mask,
             tissue_id=tissue_id,

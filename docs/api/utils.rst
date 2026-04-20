@@ -1,53 +1,53 @@
 Utilities
 =========
 
-Normalization
--------------
+Standardization
+---------------
 
-.. autofunction:: spatialprot_data.utils.dataset.build_normalizer
+The multiplex standardization stack currently lives in
+``spora_io.utils.dataset.standardize``.
 
-.. autoclass:: spatialprot_data.utils.dataset.normalize.BaseNormalizer
-   :members:
-   :show-inheritance:
+Important entry points:
 
-.. autoclass:: spatialprot_data.utils.dataset.normalize.IdentityNormalizer
-   :members:
-   :show-inheritance:
+- ``build_standardizer``
+- ``BaseStandardizer``
+- ``IdentityStandardizer``
+- ``StatsBackedStandardizer``
+- ``QuantileClippingStandardizer``
+- ``QuantileClippingLog1PStandardizer``
 
-.. autoclass:: spatialprot_data.utils.dataset.normalize.Q99Normalizer
-   :members:
-   :show-inheritance:
-
-.. autoclass:: spatialprot_data.utils.dataset.normalize.Q99MeanStdNormalizer
-   :members:
-   :show-inheritance:
+These classes operate on the parquet-backed standardization layout under
+``<modality>/<resolution>/standardization/<spec>/``.
 
 Image Transforms
 ----------------
 
-.. autoclass:: spatialprot_data.utils.dataset.FilterFactory
-   :members:
+The filter factory used by multiplex datasets lives in
+``spora_io.utils.dataset.transforms.FilterFactory``.
 
 Tiling
 ------
 
-.. autofunction:: spatialprot_data.utils.helpers.crop.best_mask_tiling_try_to_stop
+.. autofunction:: spora_io.utils.helpers.tile.best_mask_tiling_try_to_stop
 
-.. autoclass:: spatialprot_data.utils.helpers.crop.Tile
+.. autoclass:: spora_io.utils.helpers.tile.Tile
    :members:
 
 Collation
 ---------
 
-.. autofunction:: spatialprot_data.utils.dataset.abstract_collate_fn
+The generic collate helper lives in
+``spora_io.utils.dataset.collate.abstract_collate_fn``.
 
 General
 -------
 
-.. autofunction:: spatialprot_data.utils.utils.is_rank0
+.. autofunction:: spora_io.utils.utils.is_rank0
 
-.. autofunction:: spatialprot_data.utils.utils.print_verbose
+.. autofunction:: spora_io.utils.utils.print_verbose
 
-.. autofunction:: spatialprot_data.utils.utils.set_seed
+.. autofunction:: spora_io.utils.utils.set_seed
 
-.. autofunction:: spatialprot_data.utils.utils.get_modalities_of_dataset
+.. autofunction:: spora_io.utils.utils.get_modalities_of_dataset
+
+.. autofunction:: spora_io._config.get_datasets_dir

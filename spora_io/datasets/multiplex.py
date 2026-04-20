@@ -33,7 +33,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
                  tile_size: Optional[int] = None,
                  verbose: bool = True,
                  load_cell_metadata: bool = False,
-                 disable_quantile_mask: bool = True,
+                 disable_quantile_mask: bool = False,
                  filter_list: List[str] | None = None,
                  use_mean_std: bool = True,
                  return_uniprot_ids: bool = True,
