@@ -197,6 +197,7 @@ class BaseImagingDataset(ABC):
             if mask.shape != (target_h, target_w):
                 from PIL import Image
                 mask = np.array(Image.fromarray(mask).resize((target_w, target_h), Image.NEAREST))
+        mask = mask.astype(np.int32)
         return CellMask(
             mask=mask,
             tissue_id=tissue_id
