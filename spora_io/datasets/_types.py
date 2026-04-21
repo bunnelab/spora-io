@@ -6,9 +6,6 @@ import torch
 import numpy as np
 from numpy.typing import NDArray
 
-class HasName(Protocol):
-    name: str
-
 @dataclass(kw_only=True)
 class HEModality:
     """Modality class to represent the H&E modality."""
@@ -53,7 +50,7 @@ ModKey = Union[str, Modality]
 @dataclass(kw_only=True)
 class HETissue:
     """HETissue class to represent a H&E Tissue sample."""
-    tissue: torch.Tensor | NDArray[np.float32]
+    image: torch.Tensor | NDArray[np.float32]
     tissue_id: str
     channels: str = "RGB"
     kind: str = "tissue"
@@ -61,7 +58,7 @@ class HETissue:
 @dataclass(kw_only=True)
 class MultiplexTissue:
     """MultiplexTissue class to represent a Multiplex Tissue sample."""
-    tissue: torch.Tensor | NDArray[np.float32]
+    image: torch.Tensor | NDArray[np.float32]
     tissue_id: str
     kind: str = "tissue"
     measured_mask: NDArray[np.bool_] | None
@@ -72,7 +69,7 @@ class MultiplexTissue:
 @dataclass(kw_only=True)
 class IHCTissue:
     """IHCTissue class to represent an IHC Tissue sample."""
-    tissue: torch.Tensor | NDArray[np.float32]
+    image: torch.Tensor | NDArray[np.float32]
     tissue_id: str
     channels: str = "RGB"
     kind: str = "tissue"

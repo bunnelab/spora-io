@@ -84,7 +84,7 @@ class HEImagingDataset(BaseImagingDataset):
         if preprocess:
             img = self._preprocess(img)
         return HETissue(
-            tissue=img,
+            image=img,
             tissue_id=tissue_id
         )
     
@@ -151,7 +151,7 @@ class HEImagingDataset(BaseImagingDataset):
         if preprocess:
             tile = self._preprocess(tile)
         return HETissue(
-            tissue=tile,
+            image=tile,
             tissue_id=tissue_id,
             channels="RGB",
             kind="tile"

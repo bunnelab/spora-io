@@ -148,7 +148,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         img = torch.from_numpy(zarr.open(img_path, mode='r')[:]).float()
         return MultiplexTissue(
-            tissue=img,
+            image=img,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=np.ones(measured_mask.sum(), dtype=bool),
@@ -170,7 +170,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         img = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask)]).float()
         qc_mask = self.quality_control_mask & measured_mask
         return MultiplexTissue(
-            tissue=img,
+            image=img,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask,
@@ -193,7 +193,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         image_loading_mask = filtered_mask[measured_mask]
         img = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask)]).float()
         return MultiplexTissue(
-            tissue=img,
+            image=img,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask,
@@ -277,7 +277,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
 
         if preprocess:
-            img, refined_mask = self.standardizer.apply(tissue.tissue, tissue_id, tissue.measured_mask, tissue.image_loading_mask)
+            img, refined_mask = self.standardizer.apply(tissue.image, tissue_id, tissue.measured_mask, tissue.image_loading_mask)
             image_loading_mask, channel_names, uniprot_ids = self._refine_channel_metadata(
                 tissue.image_loading_mask,
                 tissue.channel_names,
@@ -285,7 +285,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 refined_mask,
             )
             return MultiplexTissue(
-                tissue=img,
+                image=img,
                 tissue_id=tissue_id,
                 measured_mask=tissue.measured_mask,
                 image_loading_mask=image_loading_mask,
@@ -328,7 +328,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
 
         if preprocess:
-            img, refined_mask = self.standardizer.apply(tile.tissue, tissue_id, tile.measured_mask, tile.image_loading_mask)
+            img, refined_mask = self.standardizer.apply(tile.image, tissue_id, tile.measured_mask, tile.image_loading_mask)
             image_loading_mask, channel_names, uniprot_ids = self._refine_channel_metadata(
                 tile.image_loading_mask,
                 tile.channel_names,
@@ -336,7 +336,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 refined_mask,
             )
             return MultiplexTissue(
-                tissue=img,
+                image=img,
                 tissue_id=tissue_id,
                 measured_mask=tile.measured_mask,
                 image_loading_mask=image_loading_mask,
@@ -382,7 +382,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         tile = torch.from_numpy(zarr.open(img_path, mode='r')[:, tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
         return MultiplexTissue(
-            tissue=tile,
+            image=tile,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=np.ones(measured_mask.sum(), dtype=bool),
@@ -406,7 +406,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         tile = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
         qc_mask = self.quality_control_mask & measured_mask
         return MultiplexTissue(
-            tissue=tile,
+            image=tile,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask,
@@ -431,7 +431,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         image_loading_mask = filtered_mask[measured_mask]
         tile = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
         return MultiplexTissue(
-            tissue=tile,
+            image=tile,
             tissue_id=tissue_id,
             measured_mask=measured_mask,
             image_loading_mask=image_loading_mask, 

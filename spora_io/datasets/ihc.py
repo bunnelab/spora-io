@@ -87,7 +87,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         if preprocess:
             img = self._preprocess(img)
         return IHCTissue(
-            tissue=img,
+            image=img,
             tissue_id=tissue_id,
             channels=self.modality.name.replace("ihc_", "")
         )
@@ -158,7 +158,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         if preprocess:
             tile = self._preprocess(tile)
         return IHCTissue(
-            tissue=tile,
+            image=tile,
             tissue_id=tissue_id,
             channels="RGB",
             kind="tile"
