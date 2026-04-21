@@ -22,8 +22,16 @@ from spora_io.datasets._types import MultiplexTissue, TissueMask, CellMask
 class MultiplexImagingDataset(BaseImagingDataset):
     """
     Class for handling multiplex imaging datasets.
+
+    Attributes:
+        VALID_MODALITIES (set): A set of valid modalities for multiplex imaging datasets. Valid options are "imc", "codex", and "cycif".
+        standardization (str): The type of standardization to apply to the images. This is passed to the build_standardizer function to create a standardizer instance.
+        disable_quantile_mask (bool): Quantile masking will search for channels with 0 quantile / variance and exclude them from standardization. Setting this to True will disable this behavior and include all channels in standardization. This is passed to the build_standardizer function.
+        filter_list (List[str]): A list of filter names to apply to the dataset. Currently supported filters are "gaussian_blur" and "median_filter". These are applied sequentially, and the parameters for each filter can be specified in the filter_params dictionary in kwargs, with the filter name as the key and the parameters as a dictionary of parameters for that filter.
+        use_mean_std (bool): Whether to use mean and standard deviation for standardization. If False, only quantile normalization will be applied if not disabled. This is passed to the build_standardizer function.
+        return_uniprot_ids (bool): Whether to return uniprot IDs for the channels. This requires a "uniprot_id" column in the channels.parquet file. If this column is not present, uniprot IDs will not be returned regardless of this setting.
     """
-    VALID_MODALITIES = {"imc", "codex", "cycif"}
+    VALID_MODALITIES = {"imc", "codex", "cycif", "mibi"}
     def __init__(self,
                  name: str,
                  path: os.PathLike | str,
@@ -209,6 +217,9 @@ class MultiplexImagingDataset(BaseImagingDataset):
         Args:
             tissue_id (str): The tissue ID to retrieve the channel names for.
             kind (str): The kind of tissue image to retrieve channel names for. Valid options are "complete", "qc_filtered", and "uniprot_filtered".
+            measured_mask (np.ndarray | None): A boolean array indicating which channels are measured for the given tissue. If None, it will be retrieved from the image_channel_map. This is used to determine which channels to consider when applying the kind filtering.
+            qc_mask (np.ndarray | None): A boolean array indicating which channels pass quality control for the given tissue. If None, it will be computed from the quality_control_mask and measured_mask. This is used when kind is "qc_filtered" or "uniprot_filtered" to determine which channels to include.
+            filtered_mask (np.ndarray | None): A boolean array indicating which channels have valid UniProt IDs for the given tissue. If None, it will be computed from the uniprot_mask and qc_mask. This is used when kind is "uniprot_filtered" to determine which channels to include.
         Returns:
             NDArray[np.str_]: The channel names as a 1D array of shape (n_channels,).
         """
@@ -228,6 +239,19 @@ class MultiplexImagingDataset(BaseImagingDataset):
         raise ValueError(f"Invalid kind {kind}. Valid options are: 'complete', 'qc_filtered', 'uniprot_filtered'.")
 
     def get_uniprot_ids(self, tissue_id: str, kind: str = "complete", measured_mask=None, qc_mask=None, filtered_mask=None) -> NDArray[np.object_] | None:
+        """
+        Get the uniprot IDs for a given tissue id and kind. This will return None if return_uniprot_ids is False or if there are no valid uniprot IDs for the given kind.
+        
+        Args:
+            tissue_id (str): The tissue ID to retrieve the uniprot IDs for.
+            kind (str): The kind of tissue image to retrieve uniprot IDs for. Valid options are "complete", "qc_filtered", and "uniprot_filtered".
+            measured_mask (np.ndarray | None): A boolean array indicating which channels are measured for the given tissue. If None, it will be retrieved from the image_channel_map. This is used to determine which channels to consider when applying the kind filtering.
+            qc_mask (np.ndarray | None): A boolean array indicating which channels pass quality control for the given tissue. If None, it will be computed from the quality_control_mask and measured_mask. This is used when kind is "qc_filtered" or "uniprot_filtered" to determine which channels to include.
+            filtered_mask (np.ndarray | None): A boolean array indicating which channels have valid UniProt IDs for the given tissue. If None, it will be computed from the uniprot_mask and qc_mask. This is used when kind is "uniprot_filtered" to determine which channels to include.
+
+        Returns:
+            NDArray[np.object_] | None: The uniprot IDs as a 1D array of shape (n_channels,). Returns None if return_uniprot_ids is False or if there are no valid uniprot IDs for the given kind.
+        """
         if not self.return_uniprot_ids:
             return None
         if measured_mask is None:
@@ -263,9 +287,18 @@ class MultiplexImagingDataset(BaseImagingDataset):
         channel_names_out = channel_names[keep_in_loaded] if channel_names is not None else None
         uniprot_ids_out = uniprot_ids[keep_in_loaded] if uniprot_ids is not None else None
         return refined_mask, channel_names_out, uniprot_ids_out
+
+
     def get_tissue(self, tissue_id: str, kind="uniprot_filtered", preprocess=True, image_mode="CHW") -> MultiplexTissue:
         """ 
         Get the tissue image for a given tissue id, with options for filtering channels and preprocessing.
+        Args:            
+            tissue_id (str): The tissue ID to retrieve the image for.
+            kind (str): The kind of tissue image to retrieve. Valid options are "complete", "qc_filtered", and "uniprot_filtered". Default is "uniprot_filtered".
+            preprocess (bool): Whether to preprocess the image using the standardizer. Default is True.
+            image_mode (str): The image mode of the tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
+        Returns:
+            MultiplexTissue: The tissue image as a MultiplexTissue instance.
         """ 
         if kind == "complete":
             tissue = self._get_tissue_all_channels(tissue_id)
@@ -284,6 +317,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 tissue.uniprot_ids,
                 refined_mask,
             )
+            if image_mode == "HWC":
+                img = rearrange(img, "C H W -> H W C")
             return MultiplexTissue(
                 image=img,
                 tissue_id=tissue_id,
@@ -292,6 +327,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 channel_names=channel_names,
                 uniprot_ids=uniprot_ids,
             )
+        if image_mode == "HWC":
+            tissue.image = rearrange(tissue.image, "C H W -> H W C")
         return tissue
 
     def _get_tissue_size(self, tissue_id: str, image_mode: str = "CHW") -> Tuple[int, int, int]:
@@ -304,8 +341,10 @@ class MultiplexImagingDataset(BaseImagingDataset):
 
 
     def get_tile_by_coordinates(self, tissue_id: str, row: int, col: int,
+                 kind: str = "uniprot_filtered",
+                 image_mode: str = "CHW",
                  preprocess: bool = True,
-                 kind: str = "uniprot_filtered") -> MultiplexTissue:
+                 ) -> MultiplexTissue:
         """
         Get a specific tile based on the tissue id and tile row and column coordinates.
         Args:
@@ -314,6 +353,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             col (int): The column coordinate of the top-left corner of the tile.
             preprocess (bool): Whether to preprocess the tile using the standardizer. Default is True.
             kind (str): The kind of tissue image to retrieve for the tile. Valid options are "complete", "qc_filtered", and "uniprot_filtered". Default is "uniprot_filtered".
+            image_mode (str): The image mode of the tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
         Returns:
             MultiplexTissue: The specific tile as a MultiplexTissue instance.
         """
@@ -335,6 +375,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 tile.uniprot_ids,
                 refined_mask,
             )
+            if image_mode == "HWC":
+                img = rearrange(img, "C H W -> H W C")
             return MultiplexTissue(
                 image=img,
                 tissue_id=tissue_id,
@@ -344,16 +386,21 @@ class MultiplexImagingDataset(BaseImagingDataset):
                 uniprot_ids=uniprot_ids,
                 kind="tile",
             )
+        if image_mode == "HWC":
+            tile.image = rearrange(tile.image, "C H W -> H W C")
         return tile
 
 
 
-    def get_tile(self, tissue_id: str, tile_id: int, preprocess=True, kind="uniprot_filtered") -> MultiplexTissue:
+    def get_tile(self, tissue_id: str, tile_id: int, kind="uniprot_filtered", image_mode="CHW", preprocess=True,) -> MultiplexTissue:
         """
         Get a specific tile based on the tissue id and tile id
         Args:
             tissue_id (str): The tissue ID to retrieve the tile for.
             tile_id (int): The tile ID to retrieve.
+            preprocess (bool): Whether to preprocess the tile using the standardizer. Default is True.
+            kind (str): The kind of tissue image to retrieve for the tile. Valid options are "complete", "qc_filtered", and "uniprot_filtered". Default is "uniprot_filtered".
+            image_mode (str): The image mode of the tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
         Returns:
             MultiplexTissue: The specific tile as an MultiplexTissue instance.
         """
@@ -364,7 +411,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         else:
             row, col = self.tile_coordinates[tissue_id][tile_id]
 
-        return self.get_tile_by_coordinates(tissue_id, row, col, preprocess=preprocess, kind=kind)
+        return self.get_tile_by_coordinates(tissue_id, row, col, preprocess=preprocess, kind=kind, image_mode=image_mode)
         
         
     

@@ -136,11 +136,8 @@ class BaseImagingDataset(ABC):
         Get the tissue image for a given tissue id. The kind argument specifies whether to return the complete tissue image (all channels) or the modality-specific tissue image (filtered channels).
         Args:
             tissue_id (str): The tissue ID to retrieve the image for.
-            kind (str): The kind of tissue image to retrieve. Default is "complete". However, subclasses can change the default to the most commonly used kind.
-                        Valid options for kind:
-                            - "complete": returns the complete tissue image with all channels
-                            - "qc_filtered": returns the tissue image with quality control 
-                            - "filtered": returns the tissue image with only the channels relevant to the dataset's modality based on the priors and quality control filtering
+            kind (str): The kind of tissue image to retrieve. However, subclasses can change the default to the most commonly used kind. 
+                        Refer to the subclass implementation for the default value and valid options for kind.
             preprocess (bool): Whether to preprocess the image (e.g. normalize) before returning it. Default is True.
             image_mode (str): The desired image mode of the returned tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
         Returns:
@@ -153,7 +150,6 @@ class BaseImagingDataset(ABC):
         Get the tissue mask for a given tissue id. If the tissue masks directory does not exist, return a full mask.
         Args:
             tissue_id (str): The tissue ID to retrieve the mask for.
-            image_mode (str): The image mode of the tissue image. Valid options are "CHW" and "HWC". Default is "HWC".
         Returns:
             TissueMask: The tissue mask as a TissueMask instance.
         """
@@ -184,12 +180,31 @@ class BaseImagingDataset(ABC):
 
 
     @abstractmethod
-    def get_tile(self, tissue_id: str, tile_id: int) -> Tissue:
+    def get_tile(self, tissue_id: str, tile_id: int, kind: str = "complete", image_mode: str = "CHW", preprocess: bool = True) -> Tissue:
         """
-        Get a specific tile based on the tissue id and tile id. 
+        Get a specific tile based on the tissue id and tile id. Tile IDs are precomputed during tiling.
+        If tile coordinates are not available, this method should return a random tile from the tissue image. Subclasses that implement tiling should override this method to load the tile based on the precomputed tile coordinates.
         Args:
             tissue_id (str): The tissue ID to retrieve the tile for.
             tile_id (int): The tile ID to retrieve.
+            kind (str): The kind of tile image to retrieve. Default is "complete".
+            image_mode (str): The image mode of the tile image. Valid options are "CHW" and "HWC". Default is "CHW".
+            preprocess (bool): Whether to preprocess the tile image (e.g. normalize) before returning it. Default is True.
+        Returns:
+            Tissue: The tile image as a Tissue instance.
+        """
+
+    @abstractmethod
+    def get_tile_by_coordinates(self, tissue_id: str, row: int, col: int, kind: str = "complete", image_mode: str = "CHW", preprocess: bool = True) -> Tissue:
+        """
+        Get a specific tile based on the tissue id and tile coordinates. This method is used when tile coordinates are not precomputed and get_tile should return a random tile.
+        Args:
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            row (int): The row coordinate of the tile.
+            col (int): The column coordinate of the tile.
+            kind (str): The kind of tile image to retrieve. Default is "complete".
+            image_mode (str): The image mode of the tile image. Valid options are "CHW" and "HWC". Default is "CHW".
+            preprocess (bool): Whether to preprocess the tile image (e.g. normalize) before returning it. Default is True.
         Returns:
             Tissue: The tile image as a Tissue instance.
         """
@@ -256,11 +271,8 @@ class BaseImagingDataset(ABC):
         Get all tissues for a given patient id.
         Args:
             patient_id (str): The patient ID to retrieve the tissues for.
-            kind (str): The kind of tissue image to retrieve. Default is "complete". However, subclasses can change the default to the most commonly used kind.
-                        Valid options for kind:
-                            - "complete": returns the complete tissue image with all channels
-                            - "qc_filtered": returns the tissue image with quality control 
-                            - "filtered": returns the tissue image with only the channels relevant to the dataset's modality based on the priors and quality control filtering
+            kind (str): The kind of tissue image to retrieve. Same as the kind argument in get_tissue method. However, subclasses can change the default to the most commonly used kind. 
+                        Refer to the subclass implementation for the default value and valid options for kind.
             preprocess (bool): Whether to preprocess the image (e.g. normalize) before returning it. Default is True.
             image_mode (str): The desired image mode of the returned tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
         Returns:
@@ -309,10 +321,6 @@ class BaseImagingDataset(ABC):
     def _count_tiles(self) -> int:
         """
         Count the number of tiles in the dataset.
-        Args:
-            tile_folder_path (str | None): The path to the tile folder. If None, uses the default tile folder.
-        Returns:
-            int: The number of tiles in the dataset.
         """
         if self.tile_coordinates is not None:
             return sum(len(coords) for coords in self.tile_coordinates.values())

@@ -24,6 +24,13 @@ Image.MAX_IMAGE_PIXELS = max_width * max_height
 class HEImagingDataset(BaseImagingDataset):
     """
     Class for handling H&E stained imaging datasets.
+
+    Attributes:
+        IMAGENET_MEAN (torch.Tensor): The mean values for ImageNet normalization.
+        IMAGENET_STD (torch.Tensor): The standard deviation values for ImageNet normalization.
+        HIBOU_MEAN (torch.Tensor): The mean values for HIBOU normalization.
+        HIBOU_STD (torch.Tensor): The standard deviation values for HIBOU normalization.
+        mean_std_type (str): The type of mean and standard deviation to use for normalization. Valid options are "imagenet" and "hibou".
     """
     IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406])[:, None, None]
     IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225])[:, None, None]
@@ -68,16 +75,17 @@ class HEImagingDataset(BaseImagingDataset):
 
         self._try_to_load_tile_coords()
 
-    def _get_tissue_all_channels(self, tissue_id: str, preprocess: bool=False, image_mode: str = "CHW") -> HETissue:
+    def _get_tissue_all_channels(self, tissue_id: str, kind: str = "complete", preprocess: bool=False, image_mode: str = "CHW") -> HETissue:
         """
         Get the full tissue image without filtering channels for a given tissue id.
         Args:
             tissue_id (str): The tissue ID to retrieve the image for.
+            kind (str): The kind of tissue image to retrieve. Only "complete" is supported for H&E datasets since there is only one modality channel. Default is "complete".
             preprocess (bool): If True, preprocess the image (normalize). Default is False.
         Returns:
             HETissue: The full tissue image as an HETissue instance.
         """
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr"
         img = torch.from_numpy(zarr.open(img_path, mode='r')[:]).float()
         if image_mode == "HWC":
             img = rearrange(img, "C H W -> H W C")
@@ -90,7 +98,7 @@ class HEImagingDataset(BaseImagingDataset):
     
     def _preprocess(self, img: NDArray[np.float32] | torch.Tensor) -> torch.Tensor:
         """
-        Preprocess the image by normalizing it.
+        Preprocess the image by standardizing it.
         Args:
             img (NDArray[np.float32] | torch.Tensor): The image to preprocess.
         Returns:
@@ -108,28 +116,27 @@ class HEImagingDataset(BaseImagingDataset):
         Get the normalized tissue image post filtering channels for a given tissue id.
         Args:
             tissue_id (str): The tissue ID to retrieve the image for.
-            kind (str): The kind of tissue image to retrieve. Default is "complete". Valid options are "complete", "qc_filtered", and "filtered".
-            For H&E datasets, "qc_filtered" and "filtered" will return the same image since there is only one modality channel.
+            kind (str): The kind of tissue image to retrieve. Only "complete" is supported for H&E datasets since there is only one modality channel. Default is "complete".
             preprocess (bool): If True, preprocess the image (normalize). Default is True.
         Returns:
             HETissue: The normalized tissue image as an HETissue instance.
         """
-        return self._get_tissue_all_channels(tissue_id, preprocess=preprocess, image_mode=image_mode)
+        return self._get_tissue_all_channels(tissue_id, kind=kind, preprocess=preprocess, image_mode=image_mode)
     
     def _get_tissue_size(self, tissue_id: str) -> Tuple[int, int, int]:
         """
         Get the tissue size (C,H,W) for a given tissue id.
         Args:
             tissue_id (str): The tissue ID to retrieve the size for.
-            image_mode (str): The image mode of the tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
         Returns:
             Tuple[int, int, int]: The tissue size as a tuple (C, H, W).
         """
-        img_path = self.img_folder / f"{tissue_id}.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr"
         img = zarr.open(img_path, mode='r')
         return img.shape[0], img.shape[1], img.shape[2] #type: ignore
 
     def get_tile_by_coordinates(self, tissue_id: str, row: int, col: int,
+                 kind: str = "complete",
                  image_mode: str = "CHW",
                  preprocess: bool = True) -> HETissue:
         """
@@ -138,13 +145,14 @@ class HEImagingDataset(BaseImagingDataset):
             tissue_id (str): The tissue ID to retrieve the tile for.
             row (int): The row coordinate of the tile.
             col (int): The column coordinate of the tile.
+            kind (str): The kind of tile image to retrieve. Default is "complete".
             image_mode (str): The image mode of the tile image. Valid options are "CHW" and "HWC". Default is "CHW".
             preprocess (bool): If True, preprocess the image (normalize). Default is True.
         Returns:
             HETissue: The specific tile as an HETissue instance.
         """ 
         tile = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.zarr", mode='r')[row:row+self.tile_size, col:col+self.tile_size, :] # type: ignore
+            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr", mode='r')[row:row+self.tile_size, col:col+self.tile_size, :] # type: ignore
         ).float()
         if image_mode == "HWC":
             tile = rearrange(tile, "C H W -> H W C")
@@ -159,6 +167,7 @@ class HEImagingDataset(BaseImagingDataset):
 
 
     def get_tile(self, tissue_id: str, tile_id: int,
+                 kind: str = "complete",
                  image_mode: str = "CHW",
                  preprocess: bool = True) -> HETissue:
         """
