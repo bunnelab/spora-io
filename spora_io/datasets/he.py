@@ -85,7 +85,7 @@ class HEImagingDataset(BaseImagingDataset):
         Returns:
             HETissue: The full tissue image as an HETissue instance.
         """
-        img_path = self.img_folder / f"{tissue_id}.ome.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         img = torch.from_numpy(zarr.open(img_path, mode='r')[:]).float()
         if image_mode == "HWC":
             img = rearrange(img, "C H W -> H W C")
@@ -131,7 +131,7 @@ class HEImagingDataset(BaseImagingDataset):
         Returns:
             Tuple[int, int, int]: The tissue size as a tuple (C, H, W).
         """
-        img_path = self.img_folder / f"{tissue_id}.ome.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         img = zarr.open(img_path, mode='r')
         return img.shape[0], img.shape[1], img.shape[2] #type: ignore
 
@@ -150,9 +150,9 @@ class HEImagingDataset(BaseImagingDataset):
             preprocess (bool): If True, preprocess the image (normalize). Default is True.
         Returns:
             HETissue: The specific tile as an HETissue instance.
-        """ 
+        """
         tile = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr", mode='r')[row:row+self.tile_size, col:col+self.tile_size, :] # type: ignore
+            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr" / "0", mode='r')[:, row:row+self.tile_size, col:col+self.tile_size] # type: ignore
         ).float()
         if image_mode == "HWC":
             tile = rearrange(tile, "C H W -> H W C")
@@ -187,7 +187,6 @@ class HEImagingDataset(BaseImagingDataset):
         
         return self.get_tile_by_coordinates(tissue_id, row, col, preprocess=preprocess, image_mode=image_mode)
     
-
 
 
 

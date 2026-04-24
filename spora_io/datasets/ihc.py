@@ -64,7 +64,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         )
         self.mean_std_type = mean_std_type
 
-        self.img_folder = self.path / self.modality.canonical_dir / self.resolution #type: ignore
+        self.img_folder = self.path / self.modality.canonical_dir / self.resolution / "images" #type: ignore
         assert self.img_folder.exists(), f"Image folder {self.img_folder} does not exist."
 
         if self.mean_std_type == "imagenet":
@@ -89,7 +89,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         Returns:
             IHCTissue: The full tissue image as an IHCTissue instance.
         """
-        img_path = self.img_folder / f"{tissue_id}.ome.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         img = torch.from_numpy(zarr.open(img_path, mode='r')[:]).float()
         if image_mode == "HWC":
             img = rearrange(img, "C H W -> H W C")
@@ -138,7 +138,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         Returns:
             Tuple[int, int, int]: The tissue size as a tuple (C, H, W).
         """
-        img_path = self.img_folder / f"{tissue_id}.ome.zarr"
+        img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         img = zarr.open(img_path, mode='r')
         return img.shape[0], img.shape[1], img.shape[2] #type: ignore
 
@@ -164,7 +164,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         else:
             row, col = self.tile_coordinates[tissue_id][tile_id]
         tile = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr", mode='r')[row:row+self.tile_size, col:col+self.tile_size, :] # type: ignore
+            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr" / "0", mode='r')[:, row:row+self.tile_size, col:col+self.tile_size] # type: ignore
         ).float()
         if image_mode == "HWC":
             tile = rearrange(tile, "C H W -> H W C")
