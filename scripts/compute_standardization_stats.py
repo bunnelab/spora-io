@@ -23,7 +23,7 @@ from spora_io.utils.helpers.std import (
 
 VALID_METHODS = ["quantile_clipping", "quantile_clipping_log1p"]
 VALID_LEVELS = ["image", "global"]
-VALID_MODALITIES = ["codex", "cycif", "imc"]
+VALID_MODALITIES = ["codex", "cycif", "imc", "mibi"]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
