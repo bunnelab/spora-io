@@ -33,7 +33,7 @@ def load_tissue_and_mask(dataset, tissue_id: str):
     tissue_mask_data = dataset.get_tissue_mask(tissue_id)
     
     # Convert to numpy if needed
-    img = tissue_data.tissue.numpy() if isinstance(tissue_data.tissue, torch.Tensor) else tissue_data.tissue
+    img = tissue_data.image.numpy() if isinstance(tissue_data.image, torch.Tensor) else tissue_data.image
     tissue_mask = tissue_mask_data.mask.numpy() if isinstance(tissue_mask_data.mask, torch.Tensor) else tissue_mask_data.mask
     
     # Get measured mask
