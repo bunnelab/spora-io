@@ -42,7 +42,13 @@ class CycIFModality:
     name: str = "cycif"
     canonical_dir: str = "cycif"
 
-MultiplexModality = IMCModality | CODEXModality | CycIFModality
+@dataclass(kw_only=True)
+class MIBIModality:
+    """Modality class to represent the MIBI modality."""
+    name: str = "mibi"
+    canonical_dir: str = "mibi"
+
+MultiplexModality = IMCModality | CODEXModality | CycIFModality | MIBIModality
 
 Modality = HEModality | IHCModality | MultiplexModality
 ModKey = Union[str, Modality] 
