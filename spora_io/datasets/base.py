@@ -52,6 +52,7 @@ class BaseImagingDataset(ABC):
                  label_modifying_fn: Optional[Callable] = None,
                  label_type: str = "classification",
                  tile_strategy: Optional[str] = None,
+                 split: Optional[str] = None,
                  ):
         self.name = name
         self.path = Path(path)
@@ -59,6 +60,7 @@ class BaseImagingDataset(ABC):
         self.resolution = resolution
         self.tile_size = tile_size
         self.tile_strategy = tile_strategy
+        self.split = split
         if self.tile_strategy is not None and self.tile_size is None:
             raise ValueError(f"Tile strategy {self.tile_strategy} provided without tile size. Please provide a tile size to use tiling functionality.")
         if self.tile_size is None:
@@ -94,6 +96,12 @@ class BaseImagingDataset(ABC):
             self.tissue_masks_dir = None
 
         self.tissue_metadata = pd.read_parquet(self.path / "metadata" / "tissues.parquet").set_index("tissue_id")
+        if self.split is not None:
+            if "split" not in self.tissue_metadata.columns:
+                raise ValueError(f"Split column not found in tissue metadata, but split argument {self.split} was provided.")
+            self.tissue_metadata = self.tissue_metadata[self.tissue_metadata["split"] == self.split]
+            if self.tissue_metadata.empty:
+                raise ValueError(f"No tissue metadata found for split {self.split}. Please check the split argument and the contents of the tissue metadata.")
         if self.label is not None:
             self.tissue_metadata = self.tissue_metadata[self.tissue_metadata[self.label].isin(self.labels_to_keep)]
             if self.label_modifying_fn is None:

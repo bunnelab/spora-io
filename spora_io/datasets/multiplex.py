@@ -46,6 +46,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
                  use_mean_std: bool = True,
                  return_uniprot_ids: bool = True,
                  tile_strategy: Optional[str] = None,
+                 split: Optional[str] = None,
                  **kwargs
     ):
         assert modality in self.VALID_MODALITIES, f"Invalid modality {modality}. Valid options are: {self.VALID_MODALITIES}"
@@ -57,6 +58,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
                          load_cell_metadata=load_cell_metadata, 
                          verbose=verbose,
                          tile_strategy=tile_strategy,
+                         split=split,
                          **kwargs, 
                          **label_kwargs)
         self.return_uniprot_ids = return_uniprot_ids

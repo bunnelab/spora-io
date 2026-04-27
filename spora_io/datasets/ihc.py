@@ -47,6 +47,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
                  verbose: bool = True,
                  mean_std_type: str = "imagenet",
                  tile_strategy: Optional[str] = None,
+                 split: Optional[str] = None,
                  **kwargs
     ):
         self.marker_name = marker_name
@@ -61,6 +62,7 @@ class SingleIHCImagingDataset(BaseImagingDataset):
             load_cell_metadata=load_cell_metadata,
             verbose=verbose,
             tile_strategy=tile_strategy,
+            split=split,
         )
         self.mean_std_type = mean_std_type
 

@@ -46,6 +46,7 @@ class HEImagingDataset(BaseImagingDataset):
                  mean_std_type: str = "imagenet",
                  tile_size: Optional[int] = None,
                  tile_strategy: Optional[str] = None,
+                 split: Optional[str] = None,
                  **kwargs
     ):
         super().__init__(
@@ -57,6 +58,7 @@ class HEImagingDataset(BaseImagingDataset):
             load_cell_metadata=load_cell_metadata,
             verbose=verbose,
             tile_strategy=tile_strategy,
+            split=split,
             **kwargs,
         )
         self.mean_std_type = mean_std_type
