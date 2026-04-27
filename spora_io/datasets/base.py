@@ -209,16 +209,18 @@ class BaseImagingDataset(ABC):
             Tissue: The tile image as a Tissue instance.
         """
 
-    def get_cell_instance_mask(self, tissue_id: str) -> CellMask:
+    def get_cell_instance_mask(self, tissue_id: str, use_instances_from_virtues: bool = False) -> CellMask:
         """
         Get the cell instance mask for a given tissue id.
         Args:
             tissue_id (str): The tissue ID to retrieve the cell instance mask for.
+            use_instances_from_virtues (bool): Whether to use instances generated using the VirTues foundation model.
         Returns:
             CellMask: The cell instance mask as a CellMask instance.
 
         """
-        ci_mask_path = self.path / "segmentations" / self.resolution / "cell_masks" / "instances" / f"{tissue_id}.npz"
+        instance_folder = "instances_virtues" if use_instances_from_virtues else "instances"
+        ci_mask_path = self.path / "segmentations" / self.resolution / "cell_masks" / instance_folder / f"{tissue_id}.npz"
         if not ci_mask_path.exists():
             raise ValueError(f"Cell instance mask file {ci_mask_path} does not exist for tissue_id {tissue_id}.")
         mask = torch.from_numpy(np.load(ci_mask_path)["mask"].astype(np.int32))
