@@ -337,5 +337,15 @@ class BaseImagingDataset(ABC):
         else:
             return 0
 
+    def __repr__(self) -> str:
+        modality = getattr(getattr(self, "modality", None), "name", None)
+        n_tissues = len(self.tissue_modality_metadata) if hasattr(self, "tissue_modality_metadata") else "?"
+        n_tiles = self._count_tiles() if hasattr(self, "tile_coordinates") else 0
+        return (
+            f"{self.__class__.__name__}("
+            f"name={self.name!r}, modality={modality!r}, resolution={self.resolution!r}, "
+            f"tile_size={self.tile_size!r}, tile_strategy={self.tile_strategy!r}, "
+            f"n_tissues={n_tissues}, n_tiles={n_tiles})"
+        )
 
 
