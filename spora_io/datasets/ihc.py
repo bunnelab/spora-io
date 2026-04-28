@@ -144,6 +144,41 @@ class SingleIHCImagingDataset(BaseImagingDataset):
         img = zarr.open(img_path, mode='r')
         return img.shape[0], img.shape[1], img.shape[2] #type: ignore
 
+    def get_tile_by_coordinates(
+        self,
+        tissue_id: str,
+        row: int,
+        col: int,
+        kind: str = "complete",
+        image_mode: str = "CHW",
+        preprocess: bool = True,
+    ) -> IHCTissue:
+        """
+        Get a specific tile based on the tissue id and tile coordinates.
+        Args:
+            tissue_id (str): The tissue ID to retrieve the tile for.
+            row (int): The row coordinate of the tile.
+            col (int): The column coordinate of the tile.
+            kind (str): The kind of tile image to retrieve. Only "complete" is supported for IHC datasets.
+            image_mode (str): The image mode of the tile image. Valid options are "CHW" and "HWC".
+            preprocess (bool): Whether to preprocess the tile image before returning it.
+        Returns:
+            IHCTissue: The specific tile as an IHCTissue instance.
+        """
+        tile = torch.from_numpy(
+            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr" / "0", mode='r')[:, row:row+self.tile_size, col:col+self.tile_size] # type: ignore
+        ).float()
+        if image_mode == "HWC":
+            tile = rearrange(tile, "C H W -> H W C")
+        if preprocess:
+            tile = self._preprocess(tile)
+        return IHCTissue(
+            image=tile,
+            tissue_id=tissue_id,
+            channels=self.modality.name.replace("ihc_", ""),
+            kind="tile"
+        )
+
     def get_tile(self, tissue_id: str, tile_id: int,
                  kind: str = "complete",
                  image_mode: str = "CHW",
@@ -165,17 +200,5 @@ class SingleIHCImagingDataset(BaseImagingDataset):
             row = np.random.randint(0, H - self.tile_size)
         else:
             row, col = self.tile_coordinates[tissue_id][tile_id]
-        tile = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr" / "0", mode='r')[:, row:row+self.tile_size, col:col+self.tile_size] # type: ignore
-        ).float()
-        if image_mode == "HWC":
-            tile = rearrange(tile, "C H W -> H W C")
-        if preprocess:
-            tile = self._preprocess(tile)
-        return IHCTissue(
-            image=tile,
-            tissue_id=tissue_id,
-            channels="RGB",
-            kind="tile"
-        )
+        return self.get_tile_by_coordinates(tissue_id, row, col, kind=kind, image_mode=image_mode, preprocess=preprocess)
     
