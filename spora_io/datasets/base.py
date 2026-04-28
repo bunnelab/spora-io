@@ -345,7 +345,6 @@ class BaseImagingDataset(ABC):
             f"{self.__class__.__name__}("
             f"name={self.name!r}, modality={modality!r}, resolution={self.resolution!r}, "
             f"tile_size={self.tile_size!r}, tile_strategy={self.tile_strategy!r}, "
-            f"n_tissues={n_tissues}, n_tiles={n_tiles})"
+            f"split={self.split!r}, n_tissues={n_tissues}, n_tiles={n_tiles})"
         )
-
 
