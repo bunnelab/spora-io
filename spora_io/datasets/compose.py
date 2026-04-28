@@ -272,6 +272,30 @@ class ComposedImagingDataset:
             modalities=modality_tissues
         )
 
+    def get_composed_tile(self, tissue_id: str, tile_id: int, kind: str = "uniprot_filtered", preprocess: bool = True, image_mode="CHW") -> ComposedTissue:
+        """
+        Get a composed tile for a given tissue ID and tile ID, which includes all available modalities for that tissue.
+
+        Args:
+            tissue_id (str): The tissue ID to retrieve.
+            tile_id (int): The tile ID to retrieve.
+            kind (str): The kind of tile image to retrieve. Default is "uniprot_filtered". Valid options are "complete", "qc_filtered", and "uniprot_filtered".
+            preprocess (bool): If True, preprocess the images (normalize). Default is True.
+            image_mode (str): The desired image mode of the returned tile images. Valid options are "CHW" and "HWC". Default is "CHW".
+
+        Returns:
+            ComposedTissue: A ComposedTissue instance containing the tissue ID and a dictionary of modality-specific tile images.
+        """
+        modalities = self.get_modalities_of_tissue(tissue_id)
+        modality_tiles = {}
+        for mod in modalities:
+            modality_tiles[mod] = self.get_unimodal_tile(tissue_id, tile_id, mod, kind=kind, preprocess=preprocess, image_mode=image_mode)
+        
+        return ComposedTissue(
+            tissue_id=tissue_id,
+            modalities=modality_tiles
+        )
+
 
     def get_composed_tissue_by_patient(self, patient_id: str, kind: str = "uniprot_filtered", preprocess: bool = True, image_mode="CHW") -> Sequence[ComposedTissue]:
         """
