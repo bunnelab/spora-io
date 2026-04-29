@@ -14,11 +14,11 @@ Required Data Configuration
 ---------------------------
 
 The loaders need a root directory containing one or more curated datasets.
-Set ``SPATIALPROT_DATASETS_DIR`` to that root:
+Set ``SPORA_DATASETS_DIR`` to that root:
 
 .. code-block:: bash
 
-   export SPATIALPROT_DATASETS_DIR=/path/to/datasets_folder
+   export SPORA_DATASETS_DIR=/path/to/datasets_folder
 
 If the variable is not set, ``spora_io`` errs out.
 

@@ -8,7 +8,7 @@ extension point for custom standardization classes.
 Dataset Layout
 --------------
 
-Each dataset lives under ``SPATIALPROT_DATASETS_DIR``:
+Each dataset lives under ``SPORA_DATASETS_DIR``:
 
 .. code-block:: text
 

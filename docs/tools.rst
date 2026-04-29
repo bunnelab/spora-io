@@ -9,7 +9,7 @@ Before running these tools, point ``spora_io`` to the datasets root:
 
 .. code-block:: bash
 
-   export SPATIALPROT_DATASETS_DIR=/path/to/datasets_v2
+   export SPORA_DATASETS_DIR=/path/to/datasets_v2
 
 Channel TUI
 -----------
@@ -107,7 +107,7 @@ Common production-style command:
 
 Important arguments:
 
-- ``--dataset-name``: dataset folder under ``SPATIALPROT_DATASETS_DIR``.
+- ``--dataset-name``: dataset folder under ``SPORA_DATASETS_DIR``.
 - ``--tile-size``: square tile size in pixels.
 - ``--resolution``: mask resolution in microns per pixel; ``1.0`` maps to
   ``1_0mpp``.
@@ -167,7 +167,7 @@ Log-compressed standardization:
 
 Important arguments:
 
-- ``--dataset-name``: dataset folder under ``SPATIALPROT_DATASETS_DIR``.
+- ``--dataset-name``: dataset folder under ``SPORA_DATASETS_DIR``.
 - ``--modality``: one of ``codex``, ``cycif``, ``imc``, or ``mibi``.
 - ``--method``: ``quantile_clipping`` or ``quantile_clipping_log1p``.
 - ``--quantile-level``: ``image`` or ``global`` for quantile computation.
