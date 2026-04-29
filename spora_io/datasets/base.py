@@ -128,7 +128,7 @@ class BaseImagingDataset(ABC):
         Args:
             kind (str): The kind of tissue IDs to retrieve. Default is "modality", which returns tissue ids for tissues that have the specified modality. If "all", returns tissue ids for all tissues in the dataset.  
         Returns:
-            NDArray[np.str_]: An array of unique tissue IDs.
+            numpy.ndarray: An array of unique tissue IDs.
         """
         if kind == "modality":
             return self.tissue_modality_metadata.index.values
@@ -140,16 +140,9 @@ class BaseImagingDataset(ABC):
 
     @abstractmethod 
     def get_tissue(self, tissue_id: str, kind="complete", preprocess: bool = True, image_mode: str = "CHW") -> Tissue:
-        """
-        Get the tissue image for a given tissue id. The kind argument specifies whether to return the complete tissue image (all channels) or the modality-specific tissue image (filtered channels).
-        Args:
-            tissue_id (str): The tissue ID to retrieve the image for.
-            kind (str): The kind of tissue image to retrieve. However, subclasses can change the default to the most commonly used kind. 
-                        Refer to the subclass implementation for the default value and valid options for kind.
-            preprocess (bool): Whether to preprocess the image (e.g. normalize) before returning it. Default is True.
-            image_mode (str): The desired image mode of the returned tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
-        Returns:
-            Tissue: The tissue image as a Tissue instance.
+        """Get a tissue image by tissue ID.
+
+        Subclasses define the valid ``kind`` values and preprocessing behavior.
         """
         pass
 
@@ -277,17 +270,7 @@ class BaseImagingDataset(ABC):
         return [d.name for d in categories_dir.iterdir() if d.is_dir() and d.name != "instances"]
         
     def get_tissue_by_patient(self, patient_id: str, kind="complete", preprocess: bool = True, image_mode: str = "CHW") -> Sequence[Tissue]:
-        """
-        Get all tissues for a given patient id.
-        Args:
-            patient_id (str): The patient ID to retrieve the tissues for.
-            kind (str): The kind of tissue image to retrieve. Same as the kind argument in get_tissue method. However, subclasses can change the default to the most commonly used kind. 
-                        Refer to the subclass implementation for the default value and valid options for kind.
-            preprocess (bool): Whether to preprocess the image (e.g. normalize) before returning it. Default is True.
-            image_mode (str): The desired image mode of the returned tissue image. Valid options are "CHW" and "HWC". Default is "CHW".
-        Returns:
-            Sequence[Tissue]: A list of tissue images as Tissue instances.
-        """
+        """Get all tissue images associated with a patient ID."""
         tissue_ids = self.patient_tissue_map.get(str(patient_id), [])
         return [self.get_tissue(tissue_id, kind=kind, preprocess=preprocess, image_mode=image_mode) for tissue_id in tissue_ids]
 
@@ -347,4 +330,3 @@ class BaseImagingDataset(ABC):
             f"tile_size={self.tile_size!r}, tile_strategy={self.tile_strategy!r}, "
             f"split={self.split!r}, n_tissues={n_tissues}, n_tiles={n_tiles})"
         )
-

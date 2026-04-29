@@ -223,7 +223,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             qc_mask (np.ndarray | None): A boolean array indicating which channels pass quality control for the given tissue. If None, it will be computed from the quality_control_mask and measured_mask. This is used when kind is "qc_filtered" or "uniprot_filtered" to determine which channels to include.
             filtered_mask (np.ndarray | None): A boolean array indicating which channels have valid UniProt IDs for the given tissue. If None, it will be computed from the uniprot_mask and qc_mask. This is used when kind is "uniprot_filtered" to determine which channels to include.
         Returns:
-            NDArray[np.str_]: The channel names as a 1D array of shape (n_channels,).
+            numpy.ndarray: The channel names as a 1D array of shape (n_channels,).
         """
         if measured_mask is None:
             measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
@@ -252,7 +252,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
             filtered_mask (np.ndarray | None): A boolean array indicating which channels have valid UniProt IDs for the given tissue. If None, it will be computed from the uniprot_mask and qc_mask. This is used when kind is "uniprot_filtered" to determine which channels to include.
 
         Returns:
-            NDArray[np.object_] | None: The uniprot IDs as a 1D array of shape (n_channels,). Returns None if return_uniprot_ids is False or if there are no valid uniprot IDs for the given kind.
+            numpy.ndarray | None: The UniProt IDs as a 1D array of shape
+            (n_channels,). Returns None if ``return_uniprot_ids`` is False.
         """
         if not self.return_uniprot_ids:
             return None
@@ -487,4 +488,3 @@ class MultiplexImagingDataset(BaseImagingDataset):
             channel_names=self.get_channel_names(tissue_id, kind="uniprot_filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
             uniprot_ids=self.get_uniprot_ids(tissue_id, kind="uniprot_filtered", measured_mask=measured_mask, qc_mask=qc_mask, filtered_mask=filtered_mask),
         )
-

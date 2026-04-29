@@ -1,4 +1,3 @@
-from IPython.testing.decorators import f
 from spora_io.datasets._types import (
     HEModality,
     IHCModality,
