@@ -1,30 +1,39 @@
 Installation
 ============
 
-From PyPI
----------
+This repository currently provides the ``spora_io`` Python package from source.
+Install it in editable mode from the repository root:
 
 .. code-block:: bash
 
-   pip install spatialprot-data
+   git clone https://github.com/bunnelab/spora-io.git
+   cd spora-io
+   pip install -e .
 
-From source
------------
+Required Data Configuration
+---------------------------
 
-.. code-block:: bash
-
-   git clone https://github.com/bunnelab/spatialprot-data.git
-   cd spatialprot-data
-   pip install -e ".[dev]"
-
-Configuration
--------------
-
-Set the ``SPATIALPROT_DATASETS_DIR`` environment variable to point to your
-datasets root directory:
+The loaders need a root directory containing one or more curated datasets.
+Set ``SPATIALPROT_DATASETS_DIR`` to that root:
 
 .. code-block:: bash
 
-   export SPATIALPROT_DATASETS_DIR=/path/to/datasets
+   export SPATIALPROT_DATASETS_DIR=/path/to/datasets_folder
 
-If not set, the default path ``/mnt/aimm/scratch/datasets_v2`` is used.
+If the variable is not set, ``spora_io`` errs out.
+
+Runtime Dependencies
+--------------------
+
+The core loaders expect common scientific Python packages, including
+``numpy``, ``pandas``, ``torch``, ``zarr``, and ``einops``. Multiplex
+standardization and parquet-backed metadata also require parquet support
+through pandas, typically provided by ``pyarrow``.
+
+Verify Install
+--------------
+
+.. code-block:: bash
+
+   from spora_io import HEImagingDataset, MultiplexImagingDataset, ComposedImagingDataset, SporaDataset
+   print("spora_io import OK")

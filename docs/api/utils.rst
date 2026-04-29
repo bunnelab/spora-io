@@ -25,6 +25,10 @@ Image Transforms
 The filter factory used by multiplex datasets lives in
 ``spora_io.utils.dataset.transforms.FilterFactory``.
 
+.. autoclass:: spora_io.utils.dataset.transforms.FilterFactory
+   :members:
+
+
 Tiling
 ------
 
@@ -33,20 +37,8 @@ Tiling
 .. autoclass:: spora_io.utils.helpers.tile.Tile
    :members:
 
-Collation
----------
-
-The generic collate helper lives in
-``spora_io.utils.dataset.collate.abstract_collate_fn``.
-
 General
 -------
-
-.. autofunction:: spora_io.utils.utils.is_rank0
-
-.. autofunction:: spora_io.utils.utils.print_verbose
-
-.. autofunction:: spora_io.utils.utils.set_seed
 
 .. autofunction:: spora_io.utils.utils.get_modalities_of_dataset
 

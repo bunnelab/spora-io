@@ -9,5 +9,4 @@ The pages below document the current public classes and helper modules used by
 
    types
    datasets
-   channels
    utils

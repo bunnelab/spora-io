@@ -13,8 +13,14 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
-    "sphinx_autodoc_typehints",
 ]
+
+try:
+    import sphinx_autodoc_typehints  # noqa: F401
+except ImportError:
+    pass
+else:
+    extensions.append("sphinx_autodoc_typehints")
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]

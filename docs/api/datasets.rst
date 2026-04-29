@@ -38,3 +38,10 @@ Composed (Multi-modal)
 .. autoclass:: spora_io.datasets.compose.ComposedImagingDataset
    :members:
    :show-inheritance:
+
+SporaDataset (Multi-cohort)
+---------------------------
+
+.. autoclass:: spora_io.datasets.spora.SporaDataset
+   :members:
+   :show-inheritance:

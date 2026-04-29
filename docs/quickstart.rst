@@ -17,7 +17,7 @@ Loading an H&E dataset
 
    tissue_ids = dataset.get_tissue_ids()
    tissue = dataset.get_tissue(tissue_ids[0])
-   # tissue.tissue is a torch.Tensor of shape (3, H, W)
+   # tissue.image is a torch.Tensor of shape (3, H, W)
 
 Loading a multiplex dataset
 ----------------------------
@@ -29,7 +29,7 @@ Loading a multiplex dataset
    dataset = MultiplexImagingDataset(
        name="my_dataset",
        path="/path/to/dataset",
-       modality="cycif",            # or "imc", "codex"
+       modality="cycif",            # or "imc", "codex", "mibi" etc.
        standardization="identity",  # or "quantile_clipping/uq_0.99"
        resolution=1.0,
        tile_size=224,
@@ -37,7 +37,7 @@ Loading a multiplex dataset
 
    tissue_ids = dataset.get_tissue_ids()
    tissue = dataset.get_tissue(tissue_ids[0], kind="uniprot_filtered")
-   # tissue.tissue is a torch.Tensor of shape (C, H, W)
+   # tissue.image is a torch.Tensor of shape (C, H, W)
    # tissue.channel_names contains the marker names
    # tissue.uniprot_ids contains the aligned UniProt IDs when available
 
@@ -53,7 +53,8 @@ Composing multiple modalities
        path="/path/to/dataset",
        modalities=["he", "cycif"],
        resolution=1.0,
-        crop_size=224,
+       tile_size=224,
+       split="train",  # optional; filters tissues.parquet["split"]
        modality_kwargs={"cycif": {"standardization": "identity"}},
    )
 
@@ -61,10 +62,35 @@ Composing multiple modalities
    # composed.modalities["he"] -> HETissue
    # composed.modalities["cycif"] -> MultiplexTissue
 
+Loading across cohorts
+----------------------
+
+Use :class:`~spora_io.datasets.spora.SporaDataset` when training over multiple
+datasets. It builds one composed dataset per cohort and samples either tissues
+or tiles from a global index.
+
+.. code-block:: python
+
+   from spora_io import SporaDataset
+
+   dataset = SporaDataset(
+       ["dataset_a", "dataset_b"],
+       modalities=["he", "codex"],
+       resolution=1.0,
+       tile_size=224,
+       sampling_unit="tiles",
+       modality_kwargs={"codex": {"standardization": "identity"}},
+   )
+
+   sample = dataset.sample_random_tile(preprocess=False)
+   # sample["dataset_name"], sample["tissue_id"], sample["tile_id"]
+   # sample["modalities"]["he"] -> HETissue tile
+   # sample["modalities"]["codex"] -> MultiplexTissue tile
+
 Retrieving tiles
 ----------------
 
-Tiles are fixed-size crops precomputed from shared tissue masks and stored in
+Tiles are fixed-size image regions precomputed from shared tissue masks and stored in
 ``tiling/<resolution>/<strategy>/<size>_tile_coordinates.parquet``.
 
 Pass a ``tissue_id`` and ``tile_id`` to retrieve a single tile:
@@ -73,11 +99,11 @@ Pass a ``tissue_id`` and ``tile_id`` to retrieve a single tile:
 
    # H&E tile
    he_tile = he_dataset.get_tile(tissue_ids[0], tile_id=0)
-   # he_tile.tissue shape: (3, 224, 224)
+   # he_tile.image shape: (3, 224, 224)
 
    # Multiplex tile
    mx_tile = mx_dataset.get_tile(tissue_ids[0], tile_id=0, kind="complete")
-   # mx_tile.tissue shape: (C, 224, 224)
+   # mx_tile.image shape: (C, 224, 224)
 
 Inspecting channel metadata
 ----------------------------

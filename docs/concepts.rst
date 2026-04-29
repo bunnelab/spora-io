@@ -56,6 +56,8 @@ shared tissue masks, shared cell masks, and tile coordinate loading.
   loads single-marker RGB IHC images.
 - :class:`~spora_io.datasets.compose.ComposedImagingDataset`
   wraps several unimodal datasets into a single multi-modal handle.
+- :class:`~spora_io.datasets.spora.SporaDataset`
+  wraps multiple composed datasets and samples tissues or tiles across cohorts.
 
 Modality Types
 --------------
@@ -126,12 +128,12 @@ Tiling
 ------
 
 The function
-:func:`~spora_io.utils.helpers.crop.best_mask_tiling_try_to_stop`
+:func:`~spora_io.utils.helpers.tile.best_mask_tiling_try_to_stop`
 computes an optimised set of tile coordinates from a binary tissue mask. The
 result is typically persisted as a parquet file with one row per tile:
 
 - ``tissue_id``
-- ``crop_id``
+- ``tile_id``
 - ``row``
 - ``col``
 
