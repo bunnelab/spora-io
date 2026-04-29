@@ -1,9 +1,13 @@
+from typing import List, Tuple, Union
 import os
 from loguru import logger
 import random
 import numpy as np
 import torch
 from safetensors import safe_open
+from pathlib import Path
+from spora_io._config import get_datasets_dir
+from spora_io.datasets._types import MULTIPLEX_MODALITIES
 
 def is_rank0() -> bool:
     """ 
@@ -88,3 +92,22 @@ def get_modalities_of_dataset(dataset_name, base_path):
         if os.path.exists(modality_path):
             modalities.append(modality)
     return modalities
+
+
+def get_all_datasets_of_modality(modality, dataset_dir: Path | str | None = None) -> List[str]:
+    if dataset_dir is None:
+        dataset_dir = get_datasets_dir()
+    else:
+        dataset_dir = Path(dataset_dir)
+    if modality == 'multiplex':
+        modalities_to_check = MULTIPLEX_MODALITIES
+    else:
+        modalities_to_check = [modality]
+    datasets = os.listdir(dataset_dir)
+    datasets_with_modality = []
+    for dataset in datasets:
+        ds_modalities = get_modalities_of_dataset(dataset, dataset_dir)
+        for modality in modalities_to_check:
+            if modality in ds_modalities:
+                datasets_with_modality.append(dataset)
+    return list(set(datasets_with_modality))

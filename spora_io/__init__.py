@@ -6,6 +6,7 @@ from spora_io.datasets.he import HEImagingDataset
 from spora_io.datasets.ihc import SingleIHCImagingDataset
 from spora_io.datasets.multiplex import MultiplexImagingDataset
 from spora_io.datasets.compose import ComposedImagingDataset
+from spora_io.datasets.spora import SporaDataset
 
 __all__ = [
     "BaseImagingDataset",
@@ -13,4 +14,5 @@ __all__ = [
     "SingleIHCImagingDataset",
     "MultiplexImagingDataset",
     "ComposedImagingDataset",
+    "SporaDataset",
 ]

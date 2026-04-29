@@ -6,6 +6,8 @@ import torch
 import numpy as np
 from numpy.typing import NDArray
 
+MULTIPLEX_MODALITIES = ["imc", "codex", "cycif", "mibi"]
+
 @dataclass(kw_only=True)
 class HEModality:
     """Modality class to represent the H&E modality."""

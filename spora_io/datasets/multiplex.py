@@ -17,7 +17,7 @@ from spora_io.datasets.base import BaseImagingDataset
 from spora_io.utils.dataset.standardize import build_standardizer
 from spora_io.utils.utils import print_verbose
 from spora_io.utils.dataset.transforms import FilterFactory
-from spora_io.datasets._types import MultiplexTissue, TissueMask, CellMask
+from spora_io.datasets._types import MultiplexTissue, TissueMask, CellMask, MULTIPLEX_MODALITIES
 
 class MultiplexImagingDataset(BaseImagingDataset):
     """
@@ -31,7 +31,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         use_mean_std (bool): Whether to use mean and standard deviation for standardization. If False, only quantile normalization will be applied if not disabled. This is passed to the build_standardizer function.
         return_uniprot_ids (bool): Whether to return uniprot IDs for the channels. This requires a "uniprot_id" column in the channels.parquet file. If this column is not present, uniprot IDs will not be returned regardless of this setting.
     """
-    VALID_MODALITIES = {"imc", "codex", "cycif", "mibi"}
+    VALID_MODALITIES = set(MULTIPLEX_MODALITIES)
     def __init__(self,
                  name: str,
                  path: os.PathLike | str,
