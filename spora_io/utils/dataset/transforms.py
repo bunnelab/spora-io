@@ -11,7 +11,11 @@ import torch.nn.functional as F
 from typing import Any, Dict, Tuple, List
 
 class CustomGaussianBlur(object):
-
+    """
+    Applies a Gaussian blur to the input image using torchvision's v2.GaussianBlur.
+    This wrapper allows the transform to be applied to both PIL Images and NumPy arrays.
+    If the input is a NumPy array, it is converted to a PyTorch tensor, the Gaussian blur is applied, and then it is converted back to a NumPy array.   
+    """
     def __init__(self, kernel_size, sigma):
         self.transform = v2.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
 
@@ -65,11 +69,25 @@ def custom_median_filter(input_tensor: torch.Tensor, kernel_size: int = 3, paddi
 
 
 class FilterFactory:
+    """
+    A factory class to create and apply a sequence of filters to an input tensor.
+    """
+
     def __init__(
         self,
         filters_to_apply: List[str],
         filter_params: Dict[str, Dict[str, Any]],
     ):
+        """
+        Initializes the FilterFactory with the specified filters and their parameters.
+        Args:
+            filters_to_apply (List[str]): A list of filter names to apply in sequence. Supported filters include "gaussian_blur" and "median_filter".
+            filter_params (Dict[str, Dict[str, Any]]): A dictionary mapping filter names to their respective parameters. For example:
+                {
+                    "gaussian_blur": {"kernel_size": 5, "sigma": 1.0},
+                    "median_filter": {"kernel_size": 3, "padding": "reflect"}
+                }   
+        """
         self.filters_to_apply = filters_to_apply
         self.filter_params = filter_params
 
