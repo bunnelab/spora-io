@@ -19,6 +19,8 @@ from spora_io.datasets._types import get_modality_from_str, is_valid_modality_in
                                             TissueMask, CellMask
 from spora_io.utils.utils import print_verbose
 
+_TILE_COORDS_CACHE = {}
+
 
 
 
@@ -283,6 +285,11 @@ class BaseImagingDataset(ABC):
             return
 
         tile_coords_path = self.path / "tiling" / self.resolution / self.tile_strategy / f"{self.tile_size}_tile_coordinates.parquet"
+        
+        if tile_coords_path in _TILE_COORDS_CACHE:
+            self.tile_coordinates = _TILE_COORDS_CACHE[tile_coords_path]
+            return
+
         if tile_coords_path.exists():
             coords_df = pd.read_parquet(tile_coords_path)
             required_columns = {"tissue_id", "tile_id", "row", "col"}
@@ -296,6 +303,7 @@ class BaseImagingDataset(ABC):
                 tissue_id: list(zip(group["row"].astype(int), group["col"].astype(int), strict=False))
                 for tissue_id, group in coords_df.groupby("tissue_id", sort=False)
             }
+            _TILE_COORDS_CACHE[tile_coords_path] = self.tile_coordinates
             if self.verbose:
                 print_verbose(f"Loaded tile coordinates from {tile_coords_path}")
         else:
