@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spora-io"
+version = "0.1.0"
+description = "Data structures and loaders for histopathology and spatial proteomics datasets."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Charlotte Bunne", email = "charlotte.bunne@epfl.ch"},
+    {name = "Eeshaan Jain", email = "eeshaan.jain@epfl.ch"},
+    {name = "Lukas Klein", email = "lukas.klein@epfl.ch"},
+    {name = "Benedikt von Querfurth", email = "benedikt.edlervonquerfurth@epfl.ch"},
+    {name = "Johann Wenckstern", email = "johann.wenckstern@epfl.ch"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "torch>=1.13",
+    "torchvision>=0.14",
+    "numpy>=1.22",
+    "pandas>=1.5",
+    "loguru>=0.6",
+    "zarr>=2.12",
+    "einops>=0.6",
+    "Pillow>=9.0",
+    "safetensors>=0.3",
+    "tqdm>=4.60",
+    "pyarrow>=17.0.0",
+    "fastparquet>=2024.11.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-html",
+]
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme",
+    "sphinx-autodoc-typehints",
+]
+
+[project.urls]
+Repository = "https://github.com/bunnelab/spora-io"
+
+[tool.setuptools.packages.find]
+include = ["spora_io*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
