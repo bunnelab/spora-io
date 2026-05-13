@@ -8,7 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from spora_io._config import get_datasets_dir
-from spora_io.utils.helpers.tile import best_mask_tiling_try_to_stop
+from spora_io.utils.helpers.tile import best_mask_tiling_try_to_stop, get_grid_tile
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,19 +26,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tiling-method",
         default="default",
-        help="Subdirectory name under tiling/<resolution>/ used for the saved outputs.",
+        help="Subdirectory name under tiling/<resolution>/ used for saved outputs.",
+    )
+    parser.add_argument(
+        "--grid",
+        action="store_true",
+        help="Use padded fixed-grid tiling instead of adaptive greedy tiling.",
     )
     parser.add_argument(
         "--stride",
         type=int,
         default=None,
-        help="Stride in pixels. Defaults to tile_size // 2.",
+        help=(
+            "Stride in pixels. Defaults to tile_size // 2 for adaptive tiling and "
+            "tile_size for grid tiling."
+        ),
     )
     parser.add_argument(
         "--tolerance",
         type=float,
         default=0.85,
-        help="Maximum invalid-pixel fraction allowed within a tile.",
+        help="Maximum invalid-pixel fraction allowed within a tile. For grid, this keeps tiles with tissue fraction >= 1 - tolerance.",
     )
     parser.add_argument(
         "--coverage-goal",
@@ -95,8 +103,9 @@ def build_stats_row(
     tolerance: float,
     coverage_goal: float,
     min_gain_ratio: float,
+    tiling_method: str,
 ) -> dict[str, int | float | str]:
-    return {
+    row = {
         "tissue_id": tissue_id,
         "mask_height": int(mask.shape[0]),
         "mask_width": int(mask.shape[1]),
@@ -112,7 +121,12 @@ def build_stats_row(
         "tolerance": float(tolerance),
         "coverage_goal": float(coverage_goal),
         "min_gain_ratio": float(min_gain_ratio),
+        "tiling_method": str(tiling_method),
     }
+    for optional_key in ("grid_candidate_count", "padded_height", "padded_width"):
+        if optional_key in stats:
+            row[optional_key] = int(stats[optional_key])
+    return row
 
 
 def main():
@@ -123,7 +137,12 @@ def main():
     tiling_dir = dataset_root / "tiling" / resolution_dir / args.tiling_method
     coords_path = tiling_dir / f"{args.tile_size}_tile_coordinates.parquet"
     stats_path = tiling_dir / f"{args.tile_size}_tile_stats.parquet"
-    stride = args.stride if args.stride is not None else args.tile_size // 2
+    if args.stride is None:
+        stride = args.tile_size if args.grid else args.tile_size // 2
+    else:
+        stride = int(args.stride)
+    if stride <= 0:
+        raise ValueError("--stride must be positive.")
 
     if not dataset_root.exists():
         raise FileNotFoundError(f"Dataset directory does not exist: {dataset_root}")
@@ -147,17 +166,25 @@ def main():
     for mask_path in iterator:
         tissue_id = mask_path.stem
         mask = load_tissue_mask(mask_path)
-        tiles, stats, _ = best_mask_tiling_try_to_stop(
-            mask=mask,
-            tile_size=args.tile_size,
-            stride=stride,
-            tolerance=args.tolerance,
-            coverage_goal=args.coverage_goal,
-            min_gain_ratio=args.min_gain_ratio,
-            allow_overlap=True,
-            progress=not args.disable_progress,
-            progress_desc=f"Tiling tissue {tissue_id}",
-        )
+        if args.grid:
+            tiles, stats, _ = get_grid_tile(
+                mask=mask,
+                tile_size=args.tile_size,
+                stride=stride,
+                tolerance=args.tolerance,
+            )
+        else:
+            tiles, stats, _ = best_mask_tiling_try_to_stop(
+                mask=mask,
+                tile_size=args.tile_size,
+                stride=stride,
+                tolerance=args.tolerance,
+                coverage_goal=args.coverage_goal,
+                min_gain_ratio=args.min_gain_ratio,
+                allow_overlap=True,
+                progress=not args.disable_progress,
+                progress_desc=f"Tiling tissue {tissue_id}",
+            )
         coordinate_rows.extend(build_coordinate_rows(tissue_id, tiles))
         stats_rows.append(
             build_stats_row(
@@ -169,6 +196,7 @@ def main():
                 tolerance=args.tolerance,
                 coverage_goal=args.coverage_goal,
                 min_gain_ratio=args.min_gain_ratio,
+                tiling_method=args.tiling_method,
             )
         )
 
