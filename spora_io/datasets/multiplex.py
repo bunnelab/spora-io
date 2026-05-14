@@ -408,7 +408,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
             MultiplexTissue: The specific tile as an MultiplexTissue instance.
         """
         if self.tile_coordinates is None: # fallback
-            C, H, W = self._get_tissue_size(tissue_id)
+            C, H, W = self._get_cached_tissue_size(tissue_id)
             col = np.random.randint(0, W - self.tile_size)
             row = np.random.randint(0, H - self.tile_size)
         else:
@@ -430,7 +430,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
         """
         img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
-        tile = torch.from_numpy(zarr.open(img_path, mode='r')[:, tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
+        img = zarr.open(img_path, mode='r')
+        tile = self._load_padded_tile_chw(img, tile_y, tile_x)
         return MultiplexTissue(
             image=tile,
             tissue_id=tissue_id,
@@ -453,7 +454,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
         img_path = self.img_folder / f"{tissue_id}.ome.zarr" / "0"
         measured_mask = self.image_channel_map.loc[tissue_id].to_numpy(dtype=bool)
         image_loading_mask = self.quality_control_mask[measured_mask]
-        tile = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
+        img = zarr.open(img_path, mode='r')
+        tile = self._load_padded_tile_chw(img, tile_y, tile_x, channel_index=np.flatnonzero(image_loading_mask))
         qc_mask = self.quality_control_mask & measured_mask
         return MultiplexTissue(
             image=tile,
@@ -479,7 +481,8 @@ class MultiplexImagingDataset(BaseImagingDataset):
         qc_mask = self.quality_control_mask & measured_mask
         filtered_mask = self.uniprot_mask & qc_mask
         image_loading_mask = filtered_mask[measured_mask]
-        tile = torch.from_numpy(zarr.open(img_path, mode='r')[np.flatnonzero(image_loading_mask), tile_y:tile_y+self.tile_size, tile_x:tile_x+self.tile_size]).float()
+        img = zarr.open(img_path, mode='r')
+        tile = self._load_padded_tile_chw(img, tile_y, tile_x, channel_index=np.flatnonzero(image_loading_mask))
         return MultiplexTissue(
             image=tile,
             tissue_id=tissue_id,
