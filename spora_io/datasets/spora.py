@@ -77,6 +77,7 @@ class SporaDataset:
         sampling_unit: SamplingUnit | None = None,
         verbose: bool = True,
         load_cell_metadata: bool = False,
+        split: str | None = None,
         modality_kwargs: Mapping[str, Mapping[str, Any]] | None = None,
         dataset_modality_kwargs: Mapping[str, Mapping[str, Mapping[str, Any]]] | None = None,
         seed: int | None = None,
@@ -93,6 +94,7 @@ class SporaDataset:
         self.tile_strategy = tile_strategy
         self.verbose = verbose
         self.load_cell_metadata = load_cell_metadata
+        self.split = split
         self.modality_kwargs = {k: dict(v) for k, v in (modality_kwargs or {}).items()}
         self.dataset_modality_kwargs = {
             dname: {mod: dict(kwargs) for mod, kwargs in per_dataset.items()}
@@ -129,6 +131,7 @@ class SporaDataset:
                 verbose=verbose,
                 load_cell_metadata=load_cell_metadata,
                 tile_strategy=tile_strategy,
+                split=split,
                 modality_kwargs=kwargs,
             )
             self.modalities_by_dataset[dataset_name] = dataset_modalities
@@ -314,5 +317,5 @@ class SporaDataset:
         return (
             f"SporaDataset(datasets=[{', '.join(dataset_summaries)}], "
             f"sampling_unit={self.sampling_unit!r}, resolution={self.resolution!r}, "
-            f"tile_size={self.tile_size!r}, n={len(self)})"
+            f"tile_size={self.tile_size!r}, split={self.split!r}, n={len(self)})"
         )
