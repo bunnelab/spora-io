@@ -34,6 +34,8 @@ Tiling
 
 .. autofunction:: spora_io.utils.helpers.tile.best_mask_tiling_try_to_stop
 
+.. autofunction:: spora_io.utils.helpers.tile.get_grid_tile
+
 .. autoclass:: spora_io.utils.helpers.tile.Tile
    :members:
 

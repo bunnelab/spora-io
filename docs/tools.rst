@@ -89,8 +89,33 @@ Common production-style command:
        --stride 224 \
        --tolerance 0.95 \
        --coverage-goal 0.95 \
-       --min-gain-ratio 0.1 \
+      --min-gain-ratio 0.1 \
+      --overwrite
+
+Fixed-grid tiling is also available. It lays a regular grid over the padded
+mask extent and keeps tiles whose tissue fraction is at least
+``1 - tolerance``. Because padded grid tiles can extend past the image edge,
+grid outputs must be saved under a non-default strategy name; ``default`` is
+reserved for the fast no-padding tile-loading path.
+
+.. code-block:: bash
+
+   PYTHONPATH=. python -m scripts.compute_tiling \
+       --dataset-name schurch2020coordinated \
+       --tile-size 224 \
+       --resolution 1.0 \
+       --tiling-method grid_stride224 \
+       --grid \
+       --stride 224 \
+       --tolerance 0.85 \
        --overwrite
+
+This writes:
+
+.. code-block:: text
+
+   <dataset>/tiling/1_0mpp/grid_stride224/224_tile_coordinates.parquet
+   <dataset>/tiling/1_0mpp/grid_stride224/224_tile_stats.parquet
 
 Important arguments:
 
@@ -99,10 +124,17 @@ Important arguments:
 - ``--resolution``: mask resolution in microns per pixel; ``1.0`` maps to
   ``1_0mpp``.
 - ``--tiling-method``: output subdirectory under
-  ``tiling/<resolution>/``.
+  ``tiling/<resolution>/``. When ``--grid`` is used this must not be
+  ``default``.
+- ``--grid``: use padded fixed-grid tiling instead of adaptive greedy tiling.
+  Edge grid tiles that cross the image boundary are represented by their
+  original top-left ``row``/``col`` and are padded with zeros during dataset
+  loading.
 - ``--stride``: candidate lattice stride in pixels. If omitted, defaults to
-  ``tile_size // 2``.
+  ``tile_size // 2`` for adaptive tiling and ``tile_size`` for grid tiling.
 - ``--tolerance``: maximum invalid/background fraction allowed inside a tile.
+  For grid tiling, this means a tile is kept when its tissue fraction is at
+  least ``1 - tolerance``.
 - ``--coverage-goal``: target foreground coverage before adaptive stopping can
   trigger.
 - ``--min-gain-ratio``: minimum marginal new foreground area required after

@@ -32,6 +32,7 @@ Minimal Example
        resolution=1.0,
        tile_size=224,
        sampling_unit="tiles",
+       split="train",
        modality_kwargs={
            "codex": {"standardization": "quantile_clipping/uq_0.99_image"},
            "imc": {"standardization": "quantile_clipping/uq_0.99_image"},

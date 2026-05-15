@@ -79,6 +79,7 @@ or tiles from a global index.
        resolution=1.0,
        tile_size=224,
        sampling_unit="tiles",
+       split="train",  # optional; forwarded to each composed dataset
        modality_kwargs={"codex": {"standardization": "identity"}},
    )
 
@@ -92,6 +93,13 @@ Retrieving tiles
 
 Tiles are fixed-size image regions precomputed from shared tissue masks and stored in
 ``tiling/<resolution>/<strategy>/<size>_tile_coordinates.parquet``.
+
+The built-in ``default`` tile strategy assumes coordinates stay within image
+bounds and uses a direct-slice loading path. If you generate padded fixed-grid
+tiles with ``scripts.compute_tiling --grid``, save them under a non-default
+strategy such as ``grid_stride224`` and pass that value as ``tile_strategy``.
+Out-of-bounds edge tiles are loaded as partial image regions padded with zeros
+back to the requested tile size.
 
 Pass a ``tissue_id`` and ``tile_id`` to retrieve a single tile:
 

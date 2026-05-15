@@ -191,6 +191,26 @@ Outputs are written to:
 If both output files already exist, the script skips computation unless
 ``--overwrite`` is passed.
 
+To generate a fixed-grid baseline instead of adaptive greedy tiles, pass
+``--grid`` and use a non-default strategy name:
+
+.. code-block:: bash
+
+    python -m scripts.compute_tiling \
+     --dataset-name my_dataset \
+     --resolution 1.0 \
+     --tiling-method grid_stride224 \
+     --grid \
+     --tile-size 224 \
+     --stride 224 \
+     --tolerance 0.85 \
+     --overwrite
+
+For grid tiling, ``--tolerance 0.85`` keeps tiles with at least 15% tissue.
+Grid tiles at image edges are allowed to extend beyond the image; dataset
+loaders pad those edge tiles with zeros when ``tile_strategy`` is not
+``default``. Do not save grid outputs under ``tiling/.../default``.
+
 Generate Standardization Statistics
 -----------------------------------
 

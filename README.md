@@ -70,6 +70,7 @@ spora = SporaDataset(
     resolution=1.0,
     tile_size=224,
     sampling_unit="tiles",
+    split="train",
     modality_kwargs={"imc": {"standardization": "identity"}},
 )
 tile_sample = spora.sample_random_tile()
@@ -158,6 +159,15 @@ Run scripts from the repository root.
 
 ```bash
 python -m scripts.compute_tiling --dataset-name my_dataset --tile-size 224 --resolution 1.0
+
+python -m scripts.compute_tiling \
+  --dataset-name my_dataset \
+  --tile-size 224 \
+  --resolution 1.0 \
+  --tiling-method grid_stride224 \
+  --grid \
+  --stride 224 \
+  --tolerance 0.85
 
 python -m scripts.compute_standardization_stats \
   --dataset-name my_dataset \

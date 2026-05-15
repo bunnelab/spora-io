@@ -147,6 +147,16 @@ Two criteria must *both* be met to stop early:
 1. Coverage has reached ``coverage_goal``.
 2. The best remaining tile contributes fewer than ``min_gain_ratio`` new pixels.
 
+For baseline or ablation workflows,
+:func:`~spora_io.utils.helpers.tile.get_grid_tile` computes fixed-grid tiles.
+It pads the mask extent with background so that edge windows are also
+considered, then keeps windows whose tissue fraction is at least
+``1 - tolerance``. These edge windows keep their original top-left ``row`` and
+``col`` coordinates even when ``row + tile_size`` or ``col + tile_size`` is
+outside the image. Dataset loaders therefore pad only non-default tile
+strategies when an edge tile crosses the image boundary; the ``default``
+strategy remains a direct-slice fast path.
+
 Resolution Convention
 ---------------------
 
