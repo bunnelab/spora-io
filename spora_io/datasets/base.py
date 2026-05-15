@@ -63,6 +63,7 @@ class BaseImagingDataset(ABC):
         self.tile_size = tile_size
         self.tile_strategy = tile_strategy
         self.split = split
+        self._tissue_size_cache: dict[str, Tuple[int, int, int]] = {}
         if self.tile_strategy is not None and self.tile_size is None:
             raise ValueError(f"Tile strategy {self.tile_strategy} provided without tile size. Please provide a tile size to use tiling functionality.")
         if self.tile_size is None:
@@ -180,6 +181,51 @@ class BaseImagingDataset(ABC):
             Tuple[int, int, int]: The tissue size as a tuple (C, H, W).
         """
         pass
+
+    def _get_cached_tissue_size(self, tissue_id: str) -> Tuple[int, int, int]:
+        if tissue_id not in self._tissue_size_cache:
+            self._tissue_size_cache[tissue_id] = self._get_tissue_size(tissue_id)
+        return self._tissue_size_cache[tissue_id]
+
+    def _channel_count(self, channel_index: Any, total_channels: int) -> int:
+        if isinstance(channel_index, slice):
+            return len(range(*channel_index.indices(total_channels)))
+
+        channel_index = np.asarray(channel_index)
+        if channel_index.dtype == bool:
+            return int(channel_index.sum())
+        if channel_index.ndim == 0:
+            return 1
+        return int(channel_index.size)
+
+    def _load_padded_tile_chw(self, img: Any, row: int, col: int, channel_index: Any = slice(None)) -> torch.Tensor:
+        if self.tile_size is None:
+            raise ValueError("tile_size must be set to load tiles.")
+
+
+        if self.tile_strategy == "default":
+            return torch.from_numpy(img[channel_index, row: row + self.tile_size, col: col + self.tile_size]).float()
+
+        _, height, width = img.shape
+
+        if 0 <= row and 0 <= col and row + self.tile_size <= height and col + self.tile_size <= width:
+            return torch.from_numpy(img[channel_index, row: row + self.tile_size, col: col + self.tile_size]).float()
+
+        channel_count = self._channel_count(channel_index, int(img.shape[0]))
+        tile = np.zeros((channel_count, self.tile_size, self.tile_size), dtype=img.dtype)
+
+        src_row0 = max(row, 0)
+        src_col0 = max(col, 0)
+        src_row1 = min(row + self.tile_size, height)
+        src_col1 = min(col + self.tile_size, width)
+        if src_row0 >= src_row1 or src_col0 >= src_col1:
+            return torch.from_numpy(tile).float()
+
+        dst_row0 = src_row0 - row
+        dst_col0 = src_col0 - col
+        loaded = img[channel_index, src_row0:src_row1, src_col0:src_col1]
+        tile[:, dst_row0: dst_row0 + loaded.shape[1], dst_col0: dst_col0 + loaded.shape[2]] = loaded
+        return torch.from_numpy(tile).float()
 
 
     @abstractmethod

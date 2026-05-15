@@ -49,6 +49,95 @@ def _pad_to_tile(mask: np.ndarray, tile: int) -> np.ndarray:
     return out
 
 
+def get_grid_tile(
+    mask: np.ndarray,
+    tile_size: int,
+    stride: int = None,
+    tolerance: float = 0.85,
+):
+    """Return fixed-grid tiles, padding image edges with background."""
+    if stride is None:
+        stride = tile_size
+    if stride <= 0:
+        raise ValueError("stride must be positive.")
+    if not (0.0 <= tolerance < 1.0):
+        raise ValueError("tolerance must be in [0, 1).")
+
+    original_mask = (np.asarray(mask) > 0).astype(np.uint8)
+    h, w = original_mask.shape
+    H = tile_size if h <= tile_size else int(np.ceil((h - tile_size) / stride) * stride + tile_size)
+    W = tile_size if w <= tile_size else int(np.ceil((w - tile_size) / stride) * stride + tile_size)
+
+    padded_mask = np.zeros((H, W), dtype=np.uint8)
+    padded_mask[:h, :w] = original_mask
+
+    ys = np.arange(0, H - tile_size + 1, stride, dtype=np.int32)
+    xs = np.arange(0, W - tile_size + 1, stride, dtype=np.int32)
+    ys_grid, xs_grid = np.meshgrid(ys, xs, indexing="ij")
+    all_ys = ys_grid.ravel().astype(np.int32)
+    all_xs = xs_grid.ravel().astype(np.int32)
+
+    total_valid = int(original_mask.sum())
+    tile_area = tile_size * tile_size
+    covered_mask = np.zeros_like(padded_mask, dtype=np.uint8)
+    if total_valid == 0:
+        return [], {
+            "num_tiles": 0,
+            "candidate_count": 0,
+            "grid_candidate_count": int(len(all_ys)),
+            "covered_valid_pixels": 0,
+            "total_valid_pixels": 0,
+            "coverage_ratio": 1.0,
+            "total_tile_area": 0,
+            "overlap_pixels": 0,
+            "overlap_ratio": 0.0,
+            "padded_height": int(H),
+            "padded_width": int(W),
+            "stop_reason": "empty_mask",
+        }, covered_mask
+
+    ii = _integral_image(padded_mask)
+    valids = _rect_sums_vec(ii, all_ys, all_xs, tile_size, tile_size)
+    ratios = valids / float(tile_area)
+    keep = (valids > 0) & (ratios >= (1.0 - tolerance))
+
+    selected_tiles = [
+        Tile(
+            y=int(y),
+            x=int(x),
+            h=int(tile_size),
+            w=int(tile_size),
+            valid_ratio=float(ratio),
+            gain=int(valid),
+        )
+        for y, x, ratio, valid in zip(all_ys[keep], all_xs[keep], ratios[keep], valids[keep])
+    ]
+
+    for tile in selected_tiles:
+        patch = padded_mask[tile.y: tile.y + tile_size, tile.x: tile.x + tile_size]
+        covered_mask[tile.y: tile.y + tile_size, tile.x: tile.x + tile_size] |= patch
+
+    covered_valid = int((covered_mask[:h, :w] & original_mask).sum())
+    total_tile_area = len(selected_tiles) * tile_area
+    overlap_pixels = max(0, total_tile_area - covered_valid)
+    stats = {
+        "num_tiles": len(selected_tiles),
+        "candidate_count": int(keep.sum()),
+        "grid_candidate_count": int(len(all_ys)),
+        "accepted_candidates": len(selected_tiles),
+        "covered_valid_pixels": covered_valid,
+        "total_valid_pixels": total_valid,
+        "coverage_ratio": covered_valid / float(total_valid),
+        "total_tile_area": total_tile_area,
+        "overlap_pixels": overlap_pixels,
+        "overlap_ratio": overlap_pixels / total_tile_area if total_tile_area > 0 else 0.0,
+        "padded_height": int(H),
+        "padded_width": int(W),
+        "stop_reason": "fixed_grid_complete",
+    }
+    return selected_tiles, stats, covered_mask
+
+
 def best_mask_tiling_try_to_stop(
     mask: np.ndarray,
     tile_size: int,
@@ -315,8 +404,6 @@ def best_mask_tiling_try_to_stop(
     }
 
     return selected_tiles, stats, covered_mask
-
-
 
 
 

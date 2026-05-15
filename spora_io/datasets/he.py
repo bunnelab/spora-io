@@ -153,9 +153,8 @@ class HEImagingDataset(BaseImagingDataset):
         Returns:
             HETissue: The specific tile as an HETissue instance.
         """
-        tile = torch.from_numpy(
-            zarr.open(self.img_folder / f"{tissue_id}.ome.zarr" / "0", mode='r')[:, row:row+self.tile_size, col:col+self.tile_size] # type: ignore
-        ).float()
+        img = zarr.open(self.img_folder / f"{tissue_id}.ome.zarr" / "0", mode='r')
+        tile = self._load_padded_tile_chw(img, row, col)
         if image_mode == "HWC":
             tile = rearrange(tile, "C H W -> H W C")
         if preprocess:
@@ -181,7 +180,7 @@ class HEImagingDataset(BaseImagingDataset):
             HETissue: The specific tile as an HETissue instance.
         """
         if self.tile_coordinates is None: # fallback
-            C, H, W = self._get_tissue_size(tissue_id)
+            C, H, W = self._get_cached_tissue_size(tissue_id)
             row = np.random.randint(0, H - self.tile_size)
             col = np.random.randint(0, W - self.tile_size)
         else:
@@ -189,6 +188,5 @@ class HEImagingDataset(BaseImagingDataset):
         
         return self.get_tile_by_coordinates(tissue_id, row, col, preprocess=preprocess, image_mode=image_mode)
     
-
 
 
