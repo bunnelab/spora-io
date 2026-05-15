@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--grid",
         action="store_true",
-        help="Use padded fixed-grid tiling instead of adaptive greedy tiling.",
+        help="Use padded fixed-grid tiling instead of adaptive greedy tiling. Requires --tiling-method to be non-default.",
     )
     parser.add_argument(
         "--stride",
@@ -131,6 +131,12 @@ def build_stats_row(
 
 def main():
     args = parse_args()
+    if args.grid and args.tiling_method == "default":
+        raise ValueError(
+            "--grid cannot be used with --tiling-method default because default tile loading "
+            "uses the no-padding fast path. Pass an explicit non-default method name, e.g. "
+            "--tiling-method grid_half_overlap."
+        )
     dataset_root = get_datasets_dir() / args.dataset_name
     resolution_dir = resolution_to_dir(args.resolution)
     tissue_masks_dir = dataset_root / "segmentations" / resolution_dir / "tissue_masks"

@@ -71,6 +71,12 @@ def get_grid_tile(
     padded_mask = np.zeros((H, W), dtype=np.uint8)
     padded_mask[:h, :w] = original_mask
 
+    ys = np.arange(0, H - tile_size + 1, stride, dtype=np.int32)
+    xs = np.arange(0, W - tile_size + 1, stride, dtype=np.int32)
+    ys_grid, xs_grid = np.meshgrid(ys, xs, indexing="ij")
+    all_ys = ys_grid.ravel().astype(np.int32)
+    all_xs = xs_grid.ravel().astype(np.int32)
+
     total_valid = int(original_mask.sum())
     tile_area = tile_size * tile_size
     covered_mask = np.zeros_like(padded_mask, dtype=np.uint8)
@@ -78,7 +84,7 @@ def get_grid_tile(
         return [], {
             "num_tiles": 0,
             "candidate_count": 0,
-            "grid_candidate_count": 0,
+            "grid_candidate_count": int(len(all_ys)),
             "covered_valid_pixels": 0,
             "total_valid_pixels": 0,
             "coverage_ratio": 1.0,
@@ -89,12 +95,6 @@ def get_grid_tile(
             "padded_width": int(W),
             "stop_reason": "empty_mask",
         }, covered_mask
-
-    ys = np.arange(0, H - tile_size + 1, stride, dtype=np.int32)
-    xs = np.arange(0, W - tile_size + 1, stride, dtype=np.int32)
-    ys_grid, xs_grid = np.meshgrid(ys, xs, indexing="ij")
-    all_ys = ys_grid.ravel().astype(np.int32)
-    all_xs = xs_grid.ravel().astype(np.int32)
 
     ii = _integral_image(padded_mask)
     valids = _rect_sums_vec(ii, all_ys, all_xs, tile_size, tile_size)
@@ -404,7 +404,6 @@ def best_mask_tiling_try_to_stop(
     }
 
     return selected_tiles, stats, covered_mask
-
 
 
 
