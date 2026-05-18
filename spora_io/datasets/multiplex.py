@@ -19,6 +19,9 @@ from spora_io.utils.utils import print_verbose
 from spora_io.utils.dataset.transforms import FilterFactory
 from spora_io.datasets._types import MultiplexTissue, TissueMask, CellMask, MULTIPLEX_MODALITIES
 
+HISTONE_UNIPROT_ID = "P68431"
+
+
 class MultiplexImagingDataset(BaseImagingDataset):
     """
     Class for handling multiplex imaging datasets.
@@ -30,6 +33,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
         filter_list (List[str]): A list of filter names to apply to the dataset. Currently supported filters are "gaussian_blur" and "median_filter". These are applied sequentially, and the parameters for each filter can be specified in the filter_params dictionary in kwargs, with the filter name as the key and the parameters as a dictionary of parameters for that filter.
         use_mean_std (bool): Whether to use mean and standard deviation for standardization. If False, only quantile normalization will be applied if not disabled. This is passed to the build_standardizer function.
         return_uniprot_ids (bool): Whether to return uniprot IDs for the channels. This requires a "uniprot_id" column in the channels.parquet file. If this column is not present, uniprot IDs will not be returned regardless of this setting.
+        replace_nuclear_uniprot_ids (bool): Whether to replace UniProt IDs for channels flagged with ``is_nuclear_marker`` with Histone H3's UniProt ID (``P68431``). This lets nuclear markers participate in ``uniprot_filtered`` loading even when the source channel lacks a protein-specific UniProt ID.
     """
     VALID_MODALITIES = set(MULTIPLEX_MODALITIES)
     def __init__(self,
@@ -45,6 +49,7 @@ class MultiplexImagingDataset(BaseImagingDataset):
                  filter_list: List[str] | None = None,
                  use_mean_std: bool = True,
                  return_uniprot_ids: bool = True,
+                 replace_nuclear_uniprot_ids: bool = False,
                  tile_strategy: Optional[str] = None,
                  split: Optional[str] = None,
                  **kwargs
@@ -62,10 +67,12 @@ class MultiplexImagingDataset(BaseImagingDataset):
                          **kwargs, 
                          **label_kwargs)
         self.return_uniprot_ids = return_uniprot_ids
+        self.replace_nuclear_uniprot_ids = replace_nuclear_uniprot_ids
         self.kwargs = kwargs
         self.img_folder = self.path / self.modality.canonical_dir / self.resolution / "images"
 
         self.channel_list = pd.read_parquet(self.path / self.modality.canonical_dir / "channels.parquet")
+        self._replace_nuclear_uniprot_ids()
 
         if "qc_pass" not in self.channel_list.columns:
             print_verbose(f"No 'qc_pass' column found in channel list at {self.path / self.modality.canonical_dir / 'channels.parquet'}. All channels will be considered as passing quality control.", level="WARNING")
@@ -112,6 +119,28 @@ class MultiplexImagingDataset(BaseImagingDataset):
         # generating marker indices
         self._try_to_create_uniprot_mask()
         self._try_to_load_tile_coords()
+
+    def _replace_nuclear_uniprot_ids(self) -> None:
+        if not self.replace_nuclear_uniprot_ids:
+            return
+        if "is_nuclear_marker" not in self.channel_list.columns:
+            print_verbose(
+                "replace_nuclear_uniprot_ids=True, but channels.parquet has no "
+                "'is_nuclear_marker' column. No nuclear UniProt IDs were replaced.",
+                level="WARNING",
+            )
+            return
+        if "uniprot_id" not in self.channel_list.columns:
+            self.channel_list["uniprot_id"] = np.nan
+
+        nuclear_mask = self.channel_list["is_nuclear_marker"].fillna(False).to_numpy(dtype=bool)
+        if not nuclear_mask.any():
+            return
+        self.channel_list.loc[nuclear_mask, "uniprot_id"] = HISTONE_UNIPROT_ID
+        if self.verbose:
+            print_verbose(
+                f"Replaced UniProt IDs for {int(nuclear_mask.sum())} nuclear channels with {HISTONE_UNIPROT_ID}."
+            )
 
     def _try_to_create_uniprot_mask(self):
         if "uniprot_id" not in self.channel_list.columns:

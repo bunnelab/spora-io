@@ -31,6 +31,7 @@ Loading a multiplex dataset
        standardization="identity",  # or "quantile_clipping/uq_0.99_image"
        resolution=1.0,
        tile_size=224,
+       replace_nuclear_uniprot_ids=True,  # optional; maps nuclear markers to P68431
    )
 
    tissue_ids = dataset.get_tissue_ids()
@@ -119,6 +120,10 @@ The multiplex dataset exposes channel-level metadata:
 
    # Full channel list (DataFrame)
    dataset.channel_list[["channel_name", "qc_pass", "uniprot_id", "is_nuclear_marker"]]
+
+   # Optional constructor behavior:
+   # replace_nuclear_uniprot_ids=True sets uniprot_id="P68431" for channels
+   # where is_nuclear_marker is true.
 
    # Per-tissue channel availability matrix
    dataset.image_channel_map.head()

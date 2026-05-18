@@ -100,7 +100,12 @@ For multiplex modalities, add channel metadata:
 Useful channel columns are ``channel_name``, ``index``, ``uniprot_id``,
 ``qc_pass``, and ``is_nuclear_marker``. Nuclear stains such as DAPI may have
 missing UniProt IDs, but should be flagged with ``is_nuclear_marker`` when
-available.
+available. If you want nuclear channels to remain available in
+``kind="uniprot_filtered"`` outputs, instantiate
+:class:`~spora_io.datasets.multiplex.MultiplexImagingDataset` with
+``replace_nuclear_uniprot_ids=True``. This replaces UniProt IDs for channels
+where ``is_nuclear_marker`` is true with Histone H3's UniProt ID
+``P68431`` at load time.
 
 Images And Masks
 ----------------

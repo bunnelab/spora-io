@@ -48,6 +48,7 @@ multiplex = MultiplexImagingDataset(
     resolution=1.0,
     tile_size=224,
     standardization="quantile_clipping/uq_0.99_image",
+    replace_nuclear_uniprot_ids=True,
 )
 tissue = multiplex.get_tissue("tissue_id", kind="uniprot_filtered")
 
