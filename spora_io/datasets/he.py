@@ -39,8 +39,8 @@ class HEImagingDataset(BaseImagingDataset):
 
     def __init__(self,
                  name: str,
-                 path: os.PathLike | str,
                  resolution: float | str,
+                 path: os.PathLike | str | None = None,
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
                  mean_std_type: str = "imagenet",
@@ -188,5 +188,4 @@ class HEImagingDataset(BaseImagingDataset):
         
         return self.get_tile_by_coordinates(tissue_id, row, col, preprocess=preprocess, image_mode=image_mode)
     
-
 

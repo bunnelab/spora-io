@@ -23,7 +23,6 @@ Minimal Multiplex Example
 
    ds = MultiplexImagingDataset(
        name="schurch2020coordinated",
-       path="/mnt/aimm/scratch/datasets_v2/schurch2020coordinated",
        modality="codex",
        standardization="quantile_clipping/uq_0.99_image",
        resolution=1.0,

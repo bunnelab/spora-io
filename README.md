@@ -37,7 +37,6 @@ from spora_io import (
 
 he = HEImagingDataset(
     name="my_dataset",
-    path="/path/to/datasets_v2/my_dataset",
     resolution=1.0,
     tile_size=224,
 )
@@ -45,7 +44,6 @@ tissue = he.get_tissue("tissue_id")
 
 multiplex = MultiplexImagingDataset(
     name="my_dataset",
-    path="/path/to/datasets_v2/my_dataset",
     modality="imc",
     resolution=1.0,
     tile_size=224,
@@ -55,7 +53,6 @@ tissue = multiplex.get_tissue("tissue_id", kind="uniprot_filtered")
 
 composed = ComposedImagingDataset(
     name="my_dataset",
-    path="/path/to/datasets_v2/my_dataset",
     modalities=["he", "imc"],
     resolution=1.0,
     tile_size=224,

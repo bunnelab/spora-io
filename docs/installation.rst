@@ -20,6 +20,11 @@ Set ``SPORA_DATASETS_DIR`` to that root:
 
    export SPORA_DATASETS_DIR=/path/to/datasets_folder
 
+Dataset constructors resolve dataset roots from this environment variable by
+default. For example, ``HEImagingDataset(name="my_dataset", ...)`` loads
+``$SPORA_DATASETS_DIR/my_dataset`` unless an explicit ``path`` override is
+provided.
+
 Runtime Dependencies
 --------------------
 

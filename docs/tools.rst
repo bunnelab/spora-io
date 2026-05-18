@@ -215,7 +215,6 @@ After statistics are computed, use the spec with
 
    dataset = MultiplexImagingDataset(
        name="schurch2020coordinated",
-       path="/path/to/datasets_v2/schurch2020coordinated",
        modality="codex",
        standardization="quantile_clipping/uq_0.99_image",
        resolution=1.0,

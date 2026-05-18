@@ -34,10 +34,10 @@ class MultiplexImagingDataset(BaseImagingDataset):
     VALID_MODALITIES = set(MULTIPLEX_MODALITIES)
     def __init__(self,
                  name: str,
-                 path: os.PathLike | str,
                  modality: str,
                  standardization: str, 
                  resolution: float | str,
+                 path: os.PathLike | str | None = None,
                  tile_size: Optional[int] = None,
                  verbose: bool = True,
                  load_cell_metadata: bool = False,

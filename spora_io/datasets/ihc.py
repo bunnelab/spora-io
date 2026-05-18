@@ -39,10 +39,10 @@ class SingleIHCImagingDataset(BaseImagingDataset):
 
     def __init__(self,
                  name: str,
-                 path: os.PathLike | str,
                  marker_name: str,
                  resolution: float | str,
                  tile_size: int, 
+                 path: os.PathLike | str | None = None,
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
                  mean_std_type: str = "imagenet",

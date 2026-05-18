@@ -10,7 +10,6 @@ Loading an H&E dataset
 
    dataset = HEImagingDataset(
        name="my_dataset",
-       path="/path/to/dataset",
        resolution=1.0,
        tile_size=224,
    )
@@ -28,7 +27,6 @@ Loading a multiplex dataset
 
    dataset = MultiplexImagingDataset(
        name="my_dataset",
-       path="/path/to/dataset",
        modality="cycif",            # or "imc", "codex", "mibi" etc.
        standardization="identity",  # or "quantile_clipping/uq_0.99_image"
        resolution=1.0,
@@ -50,7 +48,6 @@ Composing multiple modalities
 
    dataset = ComposedImagingDataset(
        name="my_dataset",
-       path="/path/to/dataset",
        modalities=["he", "cycif"],
        resolution=1.0,
        tile_size=224,
@@ -153,7 +150,6 @@ Filter tissues by metadata columns at dataset construction time:
 
    dataset = HEImagingDataset(
        name="my_dataset",
-       path="/path/to/dataset",
        resolution=1.0,
        tile_size=224,
        label="Histology",

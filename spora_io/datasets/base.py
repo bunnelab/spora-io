@@ -15,6 +15,7 @@ import pandas as pd
 from numpy.typing import NDArray
 from typing import Any, Union, Tuple, Sequence, Callable, Optional
 import torch
+from spora_io._config import get_datasets_dir
 from spora_io.datasets._types import get_modality_from_str, is_valid_modality_instance, ModKey, Tissue, \
                                             TissueMask, CellMask
 from spora_io.utils.utils import print_verbose
@@ -30,7 +31,7 @@ class BaseImagingDataset(ABC):
 
     Attributes:
         name (str): The name of the dataset.
-        path (Path): The root path to the dataset.
+        path (Path): The root path to the dataset. If omitted, this resolves to ``SPORA_DATASETS_DIR / name``.
         modality (ModKey): The modality of the dataset.
         resolution (str): The resolution of the dataset in mpp, formatted as a string with underscores instead of decimals (e.g. "0_5mpp").
         tile_size (Optional[int]): The tile size in pixels. If None, tiling functionality will be disabled.
@@ -43,9 +44,9 @@ class BaseImagingDataset(ABC):
 
     def __init__(self, 
                  name: str,
-                 path: os.PathLike | str,
                  modality: ModKey,
                  resolution: float | str,
+                 path: os.PathLike | str | None = None,
                  tile_size: Optional[int] = None,
                  load_cell_metadata: bool = False,
                  verbose: bool = True,
@@ -57,7 +58,7 @@ class BaseImagingDataset(ABC):
                  split: Optional[str] = None,
                  ):
         self.name = name
-        self.path = Path(path)
+        self.path = Path(path) if path is not None else get_datasets_dir() / name
         self.verbose = verbose
         self.resolution = resolution
         self.tile_size = tile_size

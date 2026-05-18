@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
+from spora_io._config import get_datasets_dir
 from spora_io.datasets.he import HEImagingDataset
 from spora_io.datasets.ihc import SingleIHCImagingDataset
 from spora_io.datasets.multiplex import MultiplexImagingDataset
@@ -38,10 +39,10 @@ class ComposedImagingDataset:
     def __init__(
         self,
         name: str,
-        path: Union[str, Path],
         modalities: Iterable[ModKey],
         tile_size: int,
         resolution: float | str,
+        path: Union[str, Path] | None = None,
         verbose: bool = True,
         load_cell_metadata: bool = False,
         tile_strategy: Optional[str] = None,
@@ -50,7 +51,7 @@ class ComposedImagingDataset:
         modality_kwargs: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> None:
         self.name = name
-        self.path = Path(path)
+        self.path = Path(path) if path is not None else get_datasets_dir() / name
         self.verbose = verbose
         self.tile_size = tile_size
         self.tile_strategy = tile_strategy

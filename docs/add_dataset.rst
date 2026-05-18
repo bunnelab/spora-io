@@ -130,7 +130,6 @@ Before computing derived files, validate that the dataset can be opened:
 
    he = HEImagingDataset(
        name="my_dataset",
-       path="/path/to/my_dataset",
        resolution=1.0,
        tile_size=None,
    )
@@ -138,7 +137,6 @@ Before computing derived files, validate that the dataset can be opened:
 
    imc = MultiplexImagingDataset(
        name="my_dataset",
-       path="/path/to/my_dataset",
        modality="imc",
        resolution=1.0,
        tile_size=None,
@@ -256,7 +254,6 @@ Load the generated statistics by passing the same spec to the dataset:
 
    ds = MultiplexImagingDataset(
        name="my_dataset",
-       path="/path/to/my_dataset",
        modality="imc",
        resolution=1.0,
        tile_size=224,
@@ -313,7 +310,6 @@ After registering the class, test it by loading one tissue manually:
 
    ds = MultiplexImagingDataset(
        name="my_dataset",
-       path="/path/to/my_dataset",
        modality="imc",
        resolution=1.0,
        tile_size=None,
