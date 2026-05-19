@@ -30,12 +30,16 @@ class HEImagingDataset(BaseImagingDataset):
         IMAGENET_STD (torch.Tensor): The standard deviation values for ImageNet normalization.
         HIBOU_MEAN (torch.Tensor): The mean values for HIBOU normalization.
         HIBOU_STD (torch.Tensor): The standard deviation values for HIBOU normalization.
-        mean_std_type (str): The type of mean and standard deviation to use for normalization. Valid options are "imagenet" and "hibou".
+        IDENTITY_MEAN (torch.Tensor): The mean values for identity normalization.
+        IDENTITY_STD (torch.Tensor): The standard deviation values for identity normalization.
+        mean_std_type (str): The type of mean and standard deviation to use for normalization. Valid options are "imagenet", "hibou", and "identity".
     """
     IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406])[:, None, None]
     IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225])[:, None, None]
     HIBOU_MEAN = torch.tensor([0.7068, 0.5755, 0.722])[:, None, None]
     HIBOU_STD = torch.tensor([0.195, 0.2316, 0.1816])[:, None, None]
+    IDENTITY_MEAN = torch.tensor([0.0, 0.0, 0.0])[:, None, None]
+    IDENTITY_STD = torch.tensor([1.0, 1.0, 1.0])[:, None, None]
 
     def __init__(self,
                  name: str,
@@ -72,8 +76,11 @@ class HEImagingDataset(BaseImagingDataset):
         elif self.mean_std_type == "hibou":
             self.mean = self.HIBOU_MEAN
             self.std = self.HIBOU_STD
+        elif self.mean_std_type == "identity":
+            self.mean = self.IDENTITY_MEAN
+            self.std = self.IDENTITY_STD
         else:
-            raise ValueError(f"Invalid mean_std_type {self.mean_std_type}. Valid options are 'imagenet' and 'hibou'.")
+            raise ValueError(f"Invalid mean_std_type {self.mean_std_type}. Valid options are 'imagenet', 'hibou', and 'identity'.")
 
         self._try_to_load_tile_coords()
 
