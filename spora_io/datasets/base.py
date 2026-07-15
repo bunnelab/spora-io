@@ -114,7 +114,8 @@ class BaseImagingDataset(ABC):
             self.tissue_metadata[self.label] = self.tissue_metadata[self.label].map(self.label_modifying_fn)
 
             if self.label_type == "classification":
-                self.unique_labels = self.tissue_metadata[self.label].unique().to_numpy()
+                self.unique_labels = self.tissue_metadata[self.label].unique()
+                self.unique_labels = self.unique_labels.to_numpy() if isinstance(self.unique_labels, pd.Series) else self.unique_labels
                 self.label_encoder = {unique_label: i for (i, unique_label) in enumerate(self.unique_labels)}
             
 
