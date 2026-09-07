@@ -1,5 +1,6 @@
-<img src=".github/spora_io.png" alt="spora io" width="45%" style="float:left;" />
-<div style="clear:both;"></div>
+<p align="center">
+  <img src=".github/spora_io.png" alt="spora io" width="45%">
+</p>
 
 # Introduction
 
@@ -87,7 +88,7 @@ tile_sample = spora.sample_random_tile()
 
 # 🗂️ Dataset Classes
 
-In the table below, we list the core data loading classes of spora [io] as well as their intended use cases. For more information about the available functionality of each class, please refer to the documentation.
+In the table below, we list the core data loading classes of spora [io] as well as their intended use cases. For more information about the available functionality of each class, please refer to the [documentation](TBD).
 
 | Class | Use Case |
 | --- | --- |
@@ -99,7 +100,7 @@ In the table below, we list the core data loading classes of spora [io] as well 
 
 # 📋 Expected Dataset Layout
 
-spora [io] requires all datasets to be stored in the standardized dataset format of spora [data], that we outline below. For more information about this dataset format, please refer to the documentation.
+spora [io] requires all datasets to be stored in the standardized dataset format of spora [data], that we outline below. For more information about this dataset format, please refer to the [documentation](TBD).
 
 ```text
 dataset_name/
