@@ -3,29 +3,31 @@
 
 # Introduction
 
-**spora [io]** is the Python loading layer for the spora ecosystem. Building upon the unified dataset of __spora [data]__ and serving as the data interface for the benchmark suite __[spora [bench]](https://github.com/bunnelab/spora-bench)__, it provides typed dataset classes and composed loaders that turn the harmonized layout into ready-to-use training and evaluation inputs across scales:
+**spora [io]** is the Python loading layer for the spora ecosystem. Building upon the unified dataset of **[spora [data]](TBD)** and serving as the data interface for the benchmark suite **[spora [bench]](https://github.com/bunnelab/spora-bench)**, it provides typed dataset classes and composed loaders that turn the harmonized data layout of spora [data] into ready-to-use training and evaluation inputs.
 
-At the modality-level, dedicated dataset classes handle H&E, marker-specific IHC, and multiplex spatial proteomics (IMC, CODEX, CyCIF, MIBI), each with consistent access to images, masks, channel annotations, and standardization statistics. At the sample-level, composed multi-modal loaders align co-registered modalities for the same tissue. At the cohort-level, multi-cohort tissue and tile samplers enable balanced sampling across studies, sites, and acquisition protocols for large-scale pretraining and benchmarking.
+At the *modality-level*, dedicated dataset classes handle H&E, marker-specific IHC, and multiplex spatial proteomics (IMC, CODEX, CyCIF, MIBI), each with consistent access to images, masks, channel annotations, and standardization statistics. At the *sample-level*, composed multi-modal loaders align co-registered modalities for the same tissue. At the *cohort-level*, multi-cohort tissue and tile samplers enable balanced sampling across studies, sites, and acquisition protocols for large-scale pretraining and benchmarking.
 
-For more information about spora, please also refer to the following ressources:
+For more information about **spora**, please also refer to the following ressources:
 
-1. Our paper: To be announced
-2. Our project website: To be announced
-3. Documentation: To be announced
+1. Our paper: *To be announced*
+2. Our project website: *To be announced*
+3. Documentation: *To be announced*
 
 # ⚙️ Installation
-To install spora [io] run
+To install spora [io], please run:
 ```bash
 git clone https://github.com/bunnelab/spora-io.git
 cd spora-io
 pip install -e .
 ```
-and set the datasets root:
+Optionally for automatic detection of available datasets, you may set the datasets root directory via:
 ```bash
-export SPORA_DATASETS_DIR=/path/to/datasets_v2
+export SPORA_DATASETS_DIR=/path/to/datasets
 ```
 
 # 🏃 Quick Start
+
+The following minimal code example demonstrates how to instantiate four different data loading classes in order to load a single tissue or tile. Note that the example requires the environmental variable `SPORA_DATASETS_DIR` to be set, otherwise you need to specify the dataset paths explicitly when initializing the dataset classes. 
 
 ```python
 from spora_io import (
@@ -76,21 +78,25 @@ tile_sample = spora.sample_random_tile()
 
 # 🗂️ Dataset Classes
 
-| Class | Use case |
+In the table below, we list the core data loading classes of spora [io] as well as their intended use cases. For more information about the available functionality of each class, please refer to the documentation.
+
+| Class | Use Case |
 | --- | --- |
-| `HEImagingDataset` | Load one H&E modality from one dataset. |
-| `SingleIHCImagingDataset` | Load one marker-specific IHC modality. |
-| `MultiplexImagingDataset` | Load one multiplex modality with channel metadata and standardization. |
-| `ComposedImagingDataset` | Load several modalities from one dataset through shared tissue IDs. |
-| `SporaDataset` | Sample tissues or tiles across multiple datasets. |
+| `HEImagingDataset` | Access a single H&E dataset and load H&E data  |
+| `SingleIHCImagingDataset` | Access a single marker-specific IHC dataset and load single-marker IHC data. |
+| `MultiplexImagingDataset` | Access a single multiplexed imaging dataset and load multiplex data including channel metadata and standardization. |
+| `ComposedImagingDataset` | Access a single multi-modal dataset (H&E, IHC, SP) and load aligned or un-aligned multi-modal tissue data through shared tissue IDs. |
+| `SporaDataset` | Sample tissues or tiles across multiple uni- or multi-modal datasets. |
 
 # 📋 Expected Dataset Layout
+
+spora [io] requires all datasets to be stored in the standardized dataset format of spora [data], that we outline below. For more information about this dataset format, please refer to the documentation.
 
 ```text
 dataset_name/
 ├── metadata/
 │   ├── tissues.parquet
-│   └── cells.parquet                         # optional
+│   └── cells.parquet      # optional
 ├── he/
 │   └── 1_0mpp/
 │       └── images/
@@ -114,10 +120,10 @@ dataset_name/
 ├── segmentations/
 │   └── 1_0mpp/
 │       ├── tissue_masks/
-│       │   └── <tissue_id>.npz               # key: mask
+│       │   └── <tissue_id>.npz      # key: mask
 │       └── cell_masks/
 │           └── instances/
-│               └── <tissue_id>.npz           # optional
+│               └── <tissue_id>.npz      # optional
 └── tiling/
     └── 1_0mpp/
         └── default/
@@ -130,15 +136,17 @@ dataset_name/
 information. `channels_per_tissue.parquet` is indexed by `tissue_id` and stores
 per-channel availability for multiplex images.
 
-# 💾 Standardization Specs
+## Standardization Statistics
 
-Multiplex standardization stats live under:
+For multiplexed imaging data, spora [io] provides various standardization pipelines to preprocess images.
+
+Dataset- und image-level statistics precomputed and used for these pipelines are stored at:
 
 ```text
 <dataset>/<modality>/<resolution>/standardization/<method>/uq_<quantile>_<quantile_level>/
 ```
 
-Examples:
+See for example:
 
 ```text
 quantile_clipping/uq_0.99_image
@@ -151,13 +159,23 @@ clipping. Means and standard deviations are computed after that clipping
 transform, so they can differ between `uq_0.99_image` and `uq_0.99_global` even
 with the same `stats_level`.
 
-# 🛠️ Utility Scripts
+# 🛠️ Utility scripts
 
-Run scripts from the repository root.
+With spora [io], we provide multiple utility scripts to facilitate the setup of a new dataset following the structure of spora [data]:
+1. `scripts.compute_tissue_masks` to compute tissue masks.
+2. `scripts.compute_tiling` to compute tilings of the images.
+3. `scripts.compute_standardization_stats` to compute dataset and image-level statistics (means, standard deviations and quantiles) required for image preprocessing.
+
+These scripts should be executed from the repository root. Please find below examples of how to execute these scripts:
 
 ```bash
+# Computes tissue masks
+python -m scripts.compute_tissue_masks --dataset_name my_dataset
+
+# Default tiling method optimizing coverage.
 python -m scripts.compute_tiling --dataset-name my_dataset --tile-size 224 --resolution 1.0
 
+# Strided grid tiling within tissue area
 python -m scripts.compute_tiling \
   --dataset-name my_dataset \
   --tile-size 224 \
@@ -167,6 +185,7 @@ python -m scripts.compute_tiling \
   --stride 224 \
   --tolerance 0.85
 
+# Computes image-level quantiles and dataset-level statistics (mean and standard deviation) after quantile clipping.
 python -m scripts.compute_standardization_stats \
   --dataset-name my_dataset \
   --modality imc \
@@ -177,7 +196,7 @@ python -m scripts.compute_standardization_stats \
   --resolution 1.0
 ```
 
-Useful inspection tools:
+Further we provide useful CLI inspection tools to inspect the available spora datasets:
 
 ```bash
 PYTHONPATH=. python scripts/marker_viz.py
@@ -190,7 +209,7 @@ Copyright (c) ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland, Laboratory 
 
 This repository and associated code are released under the MIT Licence. See LICENSE.md for details.
 
-> **_NOTE:_**  This licence does not cover the datasets themselves. Please refer to the dataset root directories for more information about the licence of each dataset.
+**Note:**  This licence does not cover the datasets themselves. Please refer to the dataset root directories for more information about the licence of each dataset.
 
 # 📝 Citation
 *To be announced*
