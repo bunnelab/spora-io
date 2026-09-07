@@ -185,5 +185,12 @@ PYTHONPATH=. python scripts/datasets_viz.py
 PYTHONPATH=. python scripts/tile_viz.py my_dataset 224 he --mask-only
 ```
 
+# License and Terms of Use
+Copyright (c) ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland, Laboratory of Artificial Intelligence in Molecular Medicine, 2026
+
+This repository and associated code are released under the MIT Licence. See LICENSE.md for details.
+
+> **_NOTE:_**  This licence does not cover the datasets themselves. Please refer to the dataset root directories for more information about the licence of each dataset.
+
 # 📝 Citation
 *To be announced*
