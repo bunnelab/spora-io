@@ -13,6 +13,15 @@ For more information about **spora**, please also refer to the following ressour
 2. Our project website: *To be announced*
 3. Documentation: *To be announced*
 
+## Table of Contents
+1. ⚙️ [Installation](#️-installation)
+2. 🏃 [Quick Start](#-quick-start)
+3. 🗂️ [Dataset Classes](#️-dataset-classes)
+4. 📋 [Expected Dataset Layout](#-expected-dataset-layout)
+5. 🛠️ [Utility Scripts](#️-utility-scripts)
+6. ⚖️ [Licence and Terms of Use](#️-license-and-terms-of-use)
+7. 📝 [Citation](#-citation)
+
 # ⚙️ Installation
 To install spora [io], please run:
 ```bash
@@ -204,7 +213,7 @@ PYTHONPATH=. python scripts/datasets_viz.py
 PYTHONPATH=. python scripts/tile_viz.py my_dataset 224 he --mask-only
 ```
 
-# License and Terms of Use
+# ⚖️ License and Terms of Use
 Copyright (c) ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland, Laboratory of Artificial Intelligence in Molecular Medicine, 2026
 
 This repository and associated code are released under the MIT Licence. See LICENSE.md for details.
