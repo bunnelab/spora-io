@@ -4,7 +4,7 @@ HELPER_TEXT = """
 Compute standardization statistics (quantiles, means, stds) for a multiplex dataset.
 
 Example:
-    python -m scripts.compute_standardization_stats         --dataset-name dataset         --modality codex         --method quantile_clipping         --quantile-level image         --stats-level global         --resolution 1.0
+    python -m scripts.compute_standardization_stats --dataset-name dataset --modality codex --method quantile_clipping --quantile-level image --stats-level global --resolution 1.0
 """
 
 import argparse
@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset-name",
+        "--dataset_name",
         required=True,
         help="Dataset name under the datasets root.",
     )

@@ -176,6 +176,9 @@ With spora [io], we provide multiple utility scripts to facilitate the setup of 
 2. `scripts.compute_tiling` to compute tilings of the images.
 3. `scripts.compute_standardization_stats` to compute dataset and image-level statistics (means, standard deviations and quantiles) required for image preprocessing.
 
+> [!NOTE]
+> **Converting a new dataset:** First convert all images to `.zarr` and save the channel metadata (`channels.parquet` and `channels_per_tissue.parquet`). Then compute the tissue masks, convert the images to `.ome.zarr` with `scripts.convert_dataset_to_omezarr`, and compute the standardization statistics and tilings. For the full step-by-step guide, which uses the `hoefflin2026spatial` dataset as a worked example, see [dataset_creation.md](dataset_creation.md).
+
 These scripts should be executed from the repository root. Please find below examples of how to execute these scripts:
 
 ```bash

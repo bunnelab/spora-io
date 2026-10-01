@@ -15,8 +15,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Compute tile coordinates from segmentations/<resolution>/tissue_masks and save them as parquet.",
     )
-    parser.add_argument("--dataset-name", required=True, help="Dataset name under the datasets root.")
-    parser.add_argument("--tile-size", required=True, type=int, help="Square tile size in pixels.")
+    parser.add_argument(
+        "--dataset-name",
+        "--dataset_name",
+        required=True,
+        help="Dataset name under the datasets root.",
+    )
+    parser.add_argument(
+        "--tile-size",
+        "--tile_size",
+        required=True,
+        type=int,
+        help="Square tile size in pixels.",
+    )
     parser.add_argument(
         "--resolution",
         type=float,

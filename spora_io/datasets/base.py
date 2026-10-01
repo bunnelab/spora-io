@@ -297,7 +297,8 @@ class BaseImagingDataset(ABC):
             mapping = getattr(self, f"{mask_type}_mapping")
         else:
             label_encoder = pd.read_parquet(self.path / "segmentations" / self.resolution / "cell_masks" / mask_type / "label_encoder.parquet")
-            mapping = {row["id"]: row["name"] for _, row in label_encoder.iterrows()}
+            id_col = "id" if "id" in label_encoder.columns else "index"
+            mapping = {row[id_col]: row["name"] for _, row in label_encoder.iterrows()}
             setattr(self, f"{mask_type}_label_encoder", label_encoder)
             setattr(self, f"{mask_type}_mapping", mapping)
         # label_encoder is df with columns name and id 

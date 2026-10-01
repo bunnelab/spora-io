@@ -72,7 +72,7 @@ class HESTSegmenter(torch.nn.Module):
         z = self.model(batch)
         return z
 
-he_segmenter = HESTSegmenter(checkpoint_dir="/mnt/aimm/scratch/shr/model_weights/hest-tissue-seg", device='cuda')
+he_segmenter = HESTSegmenter(device='cuda')
 he_segmenter.eval()
 eval_transforms = he_segmenter.eval_transforms
 

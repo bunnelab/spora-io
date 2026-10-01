@@ -265,9 +265,6 @@ class StatsBackedStandardizer(BaseStandardizer):
         refined: np.ndarray,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
         cache_key = (tissue_id, measured_mask.tobytes(), refined.tobytes())
-        if cache_key in self._stats_cache:
-            return self._stats_cache[cache_key]
-
         combined = measured_mask.copy()
         combined[measured_mask] = refined
 
