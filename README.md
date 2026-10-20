@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/spora_io.png" alt="spora io" width="45%">
+  <img src=".github/banner-spora-io.png" alt="spora io" width="45%">
 </p>
 
 # Introduction
@@ -9,10 +9,9 @@
 At the *modality-level*, dedicated dataset classes handle H&E, marker-specific IHC, and multiplex spatial proteomics (IMC, CODEX, CyCIF, MIBI), each with consistent access to images, masks, channel annotations, and standardization statistics. At the *sample-level*, composed multi-modal loaders align co-registered modalities for the same tissue. At the *cohort-level*, multi-cohort tissue and tile samplers enable balanced sampling across studies, sites, and acquisition protocols for large-scale pretraining and benchmarking.
 
 For more information about **spora**, please also refer to the following ressources:
-
-1. Our paper: *To be announced*
-2. Our project website: *To be announced*
-3. Documentation: *To be announced*
+1. [Paper](https://arxiv.org/abs/2610.24002)
+2. [Project website](https://spora.bioimagearchive.org)
+3. [Documentation](https://spora.epfl.ch/docs/)
 
 ## Table of Contents
 1. ⚙️ [Installation](#️-installation)
