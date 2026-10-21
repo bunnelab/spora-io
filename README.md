@@ -4,7 +4,7 @@
 
 # Introduction
 
-**spora [io]** is the Python loading layer for the spora ecosystem. Building upon the unified dataset of **[spora [data]](TBD)** and serving as the data interface for the benchmark suite **[spora [bench]](https://github.com/bunnelab/spora-bench)**, it provides typed dataset classes and composed loaders that turn the harmonized data layout of spora [data] into ready-to-use training and evaluation inputs.
+**spora [io]** is the Python loading layer for the spora ecosystem. Building upon the unified dataset of **[spora [data]](https://spora.epfl.ch/docs/io/format.html)** and serving as the data interface for the benchmark suite **[spora [bench]](https://github.com/bunnelab/spora-bench)**, it provides typed dataset classes and composed loaders that turn the harmonized data layout of spora [data] into ready-to-use training and evaluation inputs.
 
 At the *modality-level*, dedicated dataset classes handle H&E, marker-specific IHC, and multiplex spatial proteomics (IMC, CODEX, CyCIF, MIBI), each with consistent access to images, masks, channel annotations, and standardization statistics. At the *sample-level*, composed multi-modal loaders align co-registered modalities for the same tissue. At the *cohort-level*, multi-cohort tissue and tile samplers enable balanced sampling across studies, sites, and acquisition protocols for large-scale pretraining and benchmarking.
 
@@ -87,7 +87,7 @@ tile_sample = spora.sample_random_tile()
 
 # 🗂️ Dataset Classes
 
-In the table below, we list the core data loading classes of spora [io] as well as their intended use cases. For more information about the available functionality of each class, please refer to the [documentation](TBD).
+In the table below, we list the core data loading classes of spora [io] as well as their intended use cases. For more information about the available functionality of each class, please refer to the [documentation](https://spora.epfl.ch/docs/io/api/datasets.html).
 
 | Class | Use Case |
 | --- | --- |
@@ -99,7 +99,7 @@ In the table below, we list the core data loading classes of spora [io] as well 
 
 # 📋 Expected Dataset Layout
 
-spora [io] requires all datasets to be stored in the standardized dataset format of spora [data], that we outline below. For more information about this dataset format, please refer to the [documentation](TBD).
+spora [io] requires all datasets to be stored in the standardized dataset format of spora [data], that we outline below. For more information about this dataset format, please refer to the [documentation](https://spora.epfl.ch/docs/io/format.html).
 
 ```text
 dataset_name/
@@ -176,7 +176,7 @@ With spora [io], we provide multiple utility scripts to facilitate the setup of 
 3. `scripts.compute_standardization_stats` to compute dataset and image-level statistics (means, standard deviations and quantiles) required for image preprocessing.
 
 > [!NOTE]
-> **Converting a new dataset:** First convert all images to `.zarr` and save the channel metadata (`channels.parquet` and `channels_per_tissue.parquet`). Then compute the tissue masks, convert the images to `.ome.zarr` with `scripts.convert_dataset_to_omezarr`, and compute the standardization statistics and tilings. For the full step-by-step guide, which uses the `hoefflin2026spatial` dataset as a worked example, see [dataset_creation.md](dataset_creation.md).
+> **Converting a new dataset:** First convert all images to `.zarr` and save the channel metadata (`channels.parquet` and `channels_per_tissue.parquet`). Then compute the tissue masks, convert the images to `.ome.zarr` with `scripts.convert_dataset_to_omezarr`, and compute the standardization statistics and tilings. For the full step-by-step guide, which uses the `hoefflin2026spatial` dataset as a worked example, see the [documentation](https://spora.epfl.ch/docs/io/convert.html).
 
 These scripts should be executed from the repository root. Please find below examples of how to execute these scripts:
 
@@ -224,4 +224,11 @@ This repository and associated code are released under the MIT Licence. See LICE
 **Note:**  This licence does not cover the datasets themselves. Please refer to the dataset root directories for more information about the licence of each dataset.
 
 # 📝 Citation
-*To be announced*
+```
+@inproceedings{querfurth2026spora,
+  title = {{spora: A Unified Multimodal Dataset and Platform for Spatial Proteomics}},
+  author = {von Querfurth, Benedikt and Wenckstern, Johann and Jain, Eeshaan and Klein, Lukas and Cheng, Phil F. and Cheng, Yexiang and Vincent-Cuaz, Cédric and Frossard, Pascal and Haberecker, Martina and Wicki, Andreas and Michielin, Olivier and Bunne, Charlotte},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS) Evaluations \& Datasets (E\&D) Track},
+  year = {2026}
+}
+```
