@@ -23,7 +23,8 @@ from spora_io._config import get_datasets_dir
 """
 This scripts creates the images for the hoefflin2026spatial datasets.
 For this, first, download the raw images from: https://www.ebi.ac.uk/biostudies/bioimages/studies/S-BIAD2840 and rename the 'Files' folder to 'hoefflin2026spatial_raw'.
-Secondly, download the samples metadata from https://zenodo.org/records/18378034, export the xlsx file to csv and rename it to 'sample_metadata.csv' and place it in the 'hoefflin2026spatial_raw' folder.
+Secondly, for every HE image, warp it to the corresponding DAPI channel of the Codex image as presented in the scripts/datasets_creation_examples/register_hoefflin2026spatial.ipynb notebook.
+Thirdly, download the samples metadata from https://zenodo.org/records/18378034, export the xlsx file to csv and rename it to 'sample_metadata.csv' and place it in the 'hoefflin2026spatial_raw' folder.
 After executing this script, proceed with the next steps of the dataset creation pipeline.md file to create the final dataset.
 """
 
